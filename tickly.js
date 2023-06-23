@@ -341,39 +341,4 @@ yargs
 		})
 	}
 )
-.command(`update`, `update to the latest version`, (force) => {
-	return yargs.option(`force`, {
-		desc: `force download new version`,
-		required: false,
-		alias: `f`,
-	})
-},
-	async (yargs) => {
-		console.log(`${c.bold.greenBright(`Updating`)}: downloading newer version...`);
-
-		console.log(yargs);
-
-		if (!fs.existsSync(`${docFolder}\\update\\tickly-windows-x64.exe`) || yargs.force) {
-			const progressBar = new require(`cli-progress`).SingleBar({
-				format: `Downloading |${c.blueBright(`{bar}`)}| {percentage}% | ETA: {eta}s`,
-				barCompleteChar: '\u2588', barIncompleteChar: '\u2591',
-			});
-
-			progressBar.start(100, 0);
-
-			await new require(`nodejs-file-downloader`)({
-				url: "https://github.com/ealexandrohin/tickly/releases/latest/download/tickly-windows-x64.exe",
-				directory: `${docFolder}\\update\\`,
-				cloneFiles: false,
-				onProgress: (percentage) => progressBar.update(+percentage),
-			}).download();
-
-			progressBar.stop();
-		};
-
-		console.log(`${c.bold.greenBright(`Updating`)}: installing...\n\t${c.bold.magentaBright(`You need to close this cmd after you see installation window.`)}`);
-
-		require(`child_process`).execFile(`${docFolder}\\update\\tickly-windows-x64.exe`, null, null, (error) => {if (error) f.returnError(`cannot open installation file`)});
-	}
-)
 .version(version).alias(`--version`, `-v`).help().alias(`--help`, `-h`).argv;
