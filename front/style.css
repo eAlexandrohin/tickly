@@ -1,0 +1,87 @@
+.curve {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+    transform: rotate(180deg);
+}
+
+.curve svg {
+    position: relative;
+    display: block;
+    width: calc(215% + 1.3px);
+    height: 262px;
+    transform: rotateY(180deg);
+}
+
+.curve .shape-fill {
+    fill: #FFBF00;
+}
+
+.waves {
+    position: absolute;
+    top: 0;
+    left: 0;
+    aspect-ratio: auto;
+    height: 100%;
+    width: 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    background-image: url('./waves.svg');
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap');
+
+*{
+    margin: 0;
+    padding: 0;
+    font-family: 'Montserrat';
+}
+
+section{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.box{
+    position: relative;
+    width: 75vw;
+    height: 40vh;
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+
+h2{
+    font-size: 3em;
+    color: #fff;
+    text-align: center;
+}
+
+#token{
+    text-align: center;
+    margin: 3vh 3vh 3vh 3vh;
+    top: 50%;
+    color: #fff;
+    font-size: 3em;
+}
+
+#name {
+    position: absolute;
+    text-decoration: none;
+    left: 5vw;
+    color: #fff;
+    font-size: 5em;
+    font-weight: 1000;
+    top: 50;
+    top: 5vh;
+}
