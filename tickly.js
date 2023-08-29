@@ -3,12 +3,24 @@ const
 	c = require(`ansi-colors`),
 	moment = require(`moment`),
 	fs = require(`fs`),
-	docFolder = `C:\\Users\\${require(`os`).userInfo().username}\\Documents\\tickly`
+	enquirer = require(`enquirer`),
+	spinner = require(`ora`)({text: `Loading...`, color: `magentaBright`}),
+	open = require(`open`),
+	chalk = require(`chalk`),
+	ncp = require(`copy-paste`),
+	cliProgress = require(`cli-progress`),
+	downloader = require(`nodejs-file-downloader`),
+	m3u8ToMp4 = require(`m3u8-to-mp4-progress`),
+	commandExistsSync = require(`command-exists`).sync,
+	docFolder = `${require(`os`).userInfo().homedir}\\Documents\\tickly`
 ;
 
 // todo:
 // make use of users chat color
-const version = `v3.0`;
+const 
+	version = `v3.0.0`,
+	build = `2023-08-29T21:50:51.888Z` // build time
+;
 
 const f = {
 	GET: (path) => new Promise((resolve, reject) => {
@@ -40,11 +52,62 @@ const f = {
 		.then((response) => response.json())
 		.then((data) => (data.error === `Unauthorized`) ? console.log(`${c.bold.redBright(`Error`)}: your token is invalid.\nUse \"${c.bgMagenta.italic(`tickly auth`)}\" for reauth.`) : resolve(true));
 	}),
-	title: (t, full) => {
-		return ((!full && t.length < 64) || (full && t.length >= 64)) ? t.replace(/\r?\n|\r/g, `\s`).trim() : t.replace(/\r?\n|\r/g, `\s`).trim().substring(0, 64)+`...`;
+	checkURLs: (links) => {
+		let count = 0;
+
+		for (link of links) {
+			try {
+				const url = new URL(link);
+
+				count++;
+			} catch (error) {
+				spinner.stop();
+
+				f.returnError(`#${count} is broken`);
+			};
+		};
+
+		return true;
+	},
+	title: (t, full, max) => {
+		return ((!full && t.length) < (max || 64)) || ((full && t.length) >= (max || 64)) ? t.replace(/\r?\n|\r/g, `\s`).trim() : t.replace(/\r?\n|\r/g, `\s`).substring(0, max || 64).trim() + `...`;
 	},
 	streamedTime: (start) => {
 		return new Date(new Date() - new Date(start)).toLocaleTimeString();
+	},
+	getDate: (timeperiod) => {
+		const timetable = {
+			"d": 1,
+			"w": 7,
+			"m": 30,
+			"y": 365,
+		};
+
+		return moment().subtract(timetable[timeperiod], `days`).toISOString();
+	},
+	getClip: (link) => {
+		return link.split(`-`).slice(0, -2).join(`-`) + `.mp4`;
+	},
+	getClipID: (link) => {
+		const url = new URL(link);
+
+		return (url.hostname === `clips.twitch.tv`) ? url.pathname.substring(1) : url.pathname.split(`/`)[3];
+	},
+	getVod: (link, quality) => {
+		const 
+			useful = link.split(`/`).slice(4, 6),
+			q = {
+				"source": `chunked`,
+				"1080p60": `chunked`,
+				"720p60": `720p60`,
+				"720p": `720p30`,
+				"480p": `480p30`,
+				"360p": `360p30`,
+				"160p": `160p30`,
+			}
+		;
+
+		return `https://${useful[0]}.cloudfront.net/${useful[1]}/${q[quality]}/index-dvr.m3u8`
 	},
 	getDir: () => {
 		return (process.pkg) ? require(`path`).resolve(process.execPath + `/..`) : require(`path`).join(require.main ? require.main.path : process.cwd());
@@ -53,70 +116,191 @@ const f = {
 		console.log(`${c.bold.redBright(`Error`)}: ${message}.`);
 		process.exit(1);
 	},
+	copy: async (values) => {
+		for (const value of values) {
+			ncp.copy(value);
+			await ((ms) => {return new Promise(resolve => setTimeout(resolve, ms))})(1000);
+		};
+	},
 };
 
 // auth
 let auth;
-if (!fs.existsSync(`${docFolder}\\auth.json`) && process.argv[2].toLowerCase() != `auth`) {f.returnError(`no auth`)};
+if (!fs.existsSync(`${docFolder}\\auth.json`) && (!process.argv[2] || process.argv[2].toLowerCase() != `auth`)) {f.returnError(`no auth`)};
 if (fs.existsSync(`${docFolder}\\auth.json`)) {auth = require(`${docFolder}\\auth.json`)};
 
 // MAIN ENTRY POINT
 yargs
 
 .check(async (argv) => {
-	if (argv._[0] === `auth`) {return true} 
+	if (argv._[0] === `auth`) {return true};
+	if (argv.themeYellow) globalThis.themeYellow = true;
+
 	else {
 		if (await f.checkInternet() /*&& await f.checkUpdates()*/ && await f.checkAuth()) {return true} 
 		else {return false};
 	};
-
-	if (argv.themeYellow) globalThis.crdr = true;
 }, true)
-.command(`$0`, `returns your followed streams`, (yargs) => {
-	yargs.option(`full`, {
-		desc: `set full titles`,
-		required: false,
-		alias: `f`,
+.usage(`use \`[command] -h\` for details`)
+.command(`$0`, `returns followed live streams`, (yargs) => {
+	yargs.options({
+		"op": {
+			boolean: true,
+			desc: `open selected streams`,
+			required: false,
+			alias: [`o`, `open`],
+		},
+		"full": {
+			boolean: true,
+			desc: `show full titles`,
+			required: false,
+			alias: `f`,
+		},
 	});
 },
 	(yargs) => {
+		spinner.start();		
+
 		f.GET(`streams/followed?user_id=${auth.id}`)
 		.then((streams) => {
+			spinner.stop();
+
+			const choices = [];
+
 			if (streams.data.length === 0) {console.log(`${c.bold.cyanBright(`No one is live...`)}\n${c.bold.grey(`Sadge`)}`)}
 			else {
 				for (stream of streams.data) {
-					console.log(`${c.bold.magentaBright(stream.user_name)} --- ${stream.game_name} --- ${f.streamedTime(stream.started_at)} --- ${c.bold.redBright(stream.viewer_count)}\n\t>>>${f.title(stream.title, yargs.full)}`);
+					const output = `${c.bold.magentaBright(stream.user_name)} --- ${stream.game_name} --- ${f.streamedTime(stream.started_at)} --- ${c.bold.redBright(stream.viewer_count)}\n\t>>>${f.title(stream.title, yargs.full)}`;
+
+					(yargs.cp || yargs.op) ? choices.push({name: output, value: stream}) : console.log(output);
 				};
+			};
+
+			if (yargs.cp || yargs.op) {
+				// yeah shoudve not duplicate
+				// but tried creating new custom prompt type
+				// from default enquirer type and got an error
+				// reported it https://github.com/enquirer/enquirer/issues/428
+				// lets see how it goes
+
+				// got an update https://github.com/enquirer/enquirer/issues/428#issuecomment-1655617337
+				// and it seems like its not worth it 
+				// and the indicator doesnt work 
+				// so sticking with creating new prompt every time
+				enquirer.prompt({
+					type: `multiselect`,
+					name: `chosenStreams`,
+					message: `Choose streams:`,
+					limit: yargs.amount,
+					choices: choices,
+					pointer: `>`,
+					emptyError: `${c.bold.redBright(`none were selected.`)}`,
+					footer: `\nUse ${c.bold.cyanBright(`↑/↓`)} keys with ${c.bold.cyanBright(`Space[ ⎵ ]`)} and ${c.bold.cyanBright(`Enter[ ↵ ]`)}.`,
+					styles: {
+						default: chalk.reset,
+						strong: chalk.bold.cyanBright,
+						primary: chalk.bold.greenBright,
+						em: chalk.bold.greenBright,
+						success: chalk.bold.greenBright,
+					},
+					indicator (state, choice) {
+						return ` ${choice.enabled ? `●` : `○`}`;
+					},
+					result (result) {
+						return Object.values(this.map(result));
+					},
+					format() {
+						if (!this.state.submitted || this.state.cancelled) return ``;
+						if (Array.isArray(this.selected) && this.selected.length > 0) {
+							return `${c.bold.greenBright(`done!`)}`;
+						}
+						return;
+					},
+				})
+				.then(async (result) => {
+					switch (true) {
+						case yargs.cp:
+							spinner.start(`Copying values...`);
+
+							const copies = [];
+
+							for (stream of result.chosenStreams) {
+								copies.push(`https://twitch.tv/${stream.user_login}`);
+							};
+
+							f.copy(copies)
+							.then(() => {
+								spinner.stop();
+
+								console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Copy clips:`)} · ${c.bold.greenBright(`done!`)}`);
+							})
+							.catch(() => {f.returnError(`couldnt copy values`)});
+						break;
+						case yargs.op:
+							for (stream of result.chosenStreams) {
+								await open(`https://twitch.tv/${stream.user_login}`);
+							};
+						break;
+					};
+				})
+				.catch(() => {process.exit(0)});
 			};
 		});
 	}
 )
 .command(`auth`, `change account or reauth`, () => {},
-	() => {
+	async () => {
+		spinner.start();
+
 		require(`express`)().get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\auth.html`)).use(require(`express`).static(`${f.getDir()}\\front\\`)).listen(8989);
 
-		console.log(`${c.bold.magentaBright(`Auth`)}: opening browser...`);
+		spinner.stop();
 
-		require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&redirect_uri=http://localhost:8989&scope=user:read:follows+user:edit:follows`);
+		console.log(`WARNING: ${c.bold.redBright(`DO NOT SHOW ON STREAM`)}`);
 
-		require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`Paste your token: `, (token) => {
-			fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
-				headers: {
-					'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
-					'authorization': `Bearer ${token}`,
-				}
-			})
-			.then((response) => response.json())
-			.then((auth) => {
-				auth.data[0].token = token;
+		enquirer.prompt({
+			type: `Toggle`,
+			name: `warned`,
+			enabled: `yes`,
+			disabled: `no`,
+			message: `Acknowledge?`,
+			styles: {
+				default: chalk.reset,
+				strong: chalk.bold.cyanBright,
+				primary: chalk.bold.greenBright,
+				em: chalk.bold.greenBright,
+				success: chalk.bold.greenBright,
+			},
+			footer: `\nUse ${c.bold.cyanBright(`←/→`)} keys and ${c.bold.cyanBright(`Enter[ ↵ ]`)}.`,
+		}).then(async (result) => {
+			if (!result.warned) {process.exit(0)};
 
-				if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
-				fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, `\t`));
+			console.log(`${c.bold.magentaBright(`Auth`)}: opening browser...\u001B[?25h`);
 
-				console.log(c.bold.greenBright(`Success!`));
-				process.exit(0);
+			open(`https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&redirect_uri=http://localhost:8989&scope=user:read:follows+user:edit:follows`);
+
+			require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`${c.bold.cyanBright(`Paste your token`)}: `, (token) => {
+				fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
+					headers: {
+						'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
+						'authorization': `Bearer ${token}`,
+					}
+				})
+				.then((response) => response.json())
+				.then((auth) => {
+					if (auth.hasOwnProperty(`error`)) {f.returnError(`invalid token`)};
+
+					auth.data[0].token = token;
+
+					if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
+					fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, `\t`));
+
+					console.log(c.bold.greenBright(`Success!`));
+					process.exit(0);
+				});
 			});
-		});
+		})
+		.catch(() => {process.exit(0)});
 	}
 )
 .command(`live [username]`, `returns data about [username] stream`, (yargs) => {
@@ -137,6 +321,7 @@ yargs
 		});
 	}
 )
+.example(`live`, `${c.bold.magentaBright(`[username]`)} --- [category] --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
 .command(`user [username]`, `returns data about [username]`, (yargs) => {
 	yargs.positional(`username`, {
 		type: `string`,
@@ -157,6 +342,7 @@ yargs
 		});
 	}
 )
+.example(`user`, `[id] --- ${c.bold.magentaBright(`[username]`)}${c.bold.magentaBright(`[partner]`)} --- [followercount] --- [create at] --- ${c.bold.redBright(`[viewcount]`)}`)
 .command(`follows [username]`, `returns [username] follows`, (yargs) => {
 	yargs.positional(`username`, {
 		type: `string`,
@@ -183,7 +369,7 @@ yargs
 						.then((res) => {
 							result.push(...res.data);
 							cursor = res.pagination.cursor;
-						});	
+						});
 					};
 					
 					for (follow of result) {
@@ -194,33 +380,7 @@ yargs
 		})
 	}
 )
-// DEPRECATION UPDATE
-
-// .command(`follows`, `returns your follows`, () => {},
-// 	(yargs) => {
-// 		const result = [];
-
-// 		f.GET(`channels/followed?user_id=${auth.id}&first=100`)
-// 		.then((follows) => {
-// 			result.push(...follows.data);
-// 			let cursor = follows.pagination.cursor;
-
-// 			(async () => {
-// 				while (cursor) {
-// 					await f.GET(`channels/followed?user_id=${auth.id}&first=100&after=${cursor}`)
-// 					.then((res) => {
-// 						result.push(...res.data);
-// 						cursor = res.pagination.cursor;
-// 					});	
-// 				};
-				
-// 				for (follow of result) {
-// 					console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.broadcaster_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
-// 				};
-// 			})();
-// 		});
-// 	}
-// )
+.example(`follows`, `[#]\t${c.bold.magentaBright(`[follow]`)} --- [followed at] --- [followage]`)
 .command(`following <from> <to>`, `returns boolean if <from> follows <to>`, (yargs) => {
 	yargs.positional(`from`, {
 		type: `string`,
@@ -248,6 +408,7 @@ yargs
 		})
 	}
 )
+.example(`following`, `${c.bold.greenBright(`[boolean]`)} --- ${c.bold.magentaBright(`[from]`)} >>> ${c.bold.magentaBright(`[to]`)} --- [followed at] --- [followage]`)
 .command(`team <team>`, `returns data about <team>`, (yargs) => {
 	yargs.positional(`team`, {
 		type: `string`,
@@ -271,6 +432,7 @@ yargs
 		})
 	}
 )
+.example(`team`, `${c.bold.magentaBright(`[name]`)} --- [created at] ::: [createage] >>> [updated at] ::: [updateage]`)
 .command(`member <username>`, `returns teams which <username> is part of`, (yargs) => {
 	yargs.positional(`username`, {
 		type: `string`,
@@ -295,6 +457,7 @@ yargs
 		})
 	}
 )
+.example(`member`, `[#]\t${c.bold.magentaBright(`[team]`)} --- [created at] ::: [createage] >>> [updated at] ::: [updateage]`)
 .command(`directory <dirname>`, `returns streams from <dirname> directory`, (yargs) => {
 	yargs.positional(`dirname`, {
 		type: `string`,
@@ -302,7 +465,8 @@ yargs
 		desc: ``,
 	});
 	yargs.option(`full`, {
-		desc: `set full titles`,
+		boolean: true,
+		desc: `show full titles`,
 		required: false,
 		alias: `f`,
 	});
@@ -323,9 +487,11 @@ yargs
 		})
 	}
 )
+.alias(`directory`, `dir`)/*<-- doesnt work for some reason?*/.example(`directory`, `${c.bold.magentaBright(`[username]`)} --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
 .command(`top`, `returns top streams`, (yargs) => {
 	yargs.option(`full`, {
-		desc: `set full titles`,
+		boolean: true,
+		desc: `show full titles`,
 		required: false,
 		alias: `f`,
 	});
@@ -341,4 +507,573 @@ yargs
 		})
 	}
 )
+.example(`top`, `[#]\t${c.bold.magentaBright(`[username]`)} --- [category] --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
+.command(`clip <links|ids..>`, `returns data about specified clips`, (yargs) => {
+	yargs.options({
+		"id" : {
+			boolean: true,
+			desc: `input of ids`,
+			required: false,
+		},
+		"cp": {
+			boolean: true,
+			desc: `copy selected clips`,
+			required: false,
+			alias: [`c`, `copy`],
+		},
+		"op": {
+			boolean: true,
+			desc: `open selected clips`,
+			required: false,
+			alias: [`o`, `open`],
+		},
+		"dl": {
+			boolean: true,
+			desc: `download selected clips`,
+			required: false,
+			alias: [`d`, `download`],
+		},
+	});
+},
+	async (yargs) => {
+		spinner.start();
+
+		if (yargs.links.length > 100 || yargs.ids.length > 100) {
+			spinner.stop();
+
+			f.returnError(`maximum is 100`)
+		};
+
+		if (!yargs.id && f.checkURLs(yargs.links)) {
+			yargs.links.forEach((link, index) => {
+				yargs.ids[index] = f.getClipID(link);
+			});
+		};
+
+		const clips = [];
+
+		let count = 0;
+
+		for await (id of yargs.ids) {
+			await f.GET(`clips?id=${id}`)
+			.then((clip) => {
+				if (clip.data.length === 0) {
+					spinner.stop();
+
+					f.returnError(`#${count} is invalid`);
+				};
+
+				clips.push(clip.data[0]);
+				count++;
+			});
+		};
+
+		spinner.stop();
+
+		switch (true) {
+			case yargs.cp:
+				spinner.start(`Copying values...`);
+
+				const copies = [];
+
+				for (clip of clips) {
+					copies.push(clip.url);
+				};
+
+				f.copy(copies)
+				.then(() => {
+					spinner.stop();
+
+					console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Copy clips:`)} · ${c.bold.greenBright(`done!`)}`);
+				})
+				.catch(() => {f.returnError(`couldnt copy values`)});
+			break;
+			case yargs.op:
+				for (clip of clips) {
+					await open(clip.url);
+				};
+
+				console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Open clips:`)} · ${c.bold.greenBright(`done!`)}`);
+			break;
+			case yargs.dl: 						
+				const 
+					promises = [],
+					bars = [],
+					multibar = new cliProgress.MultiBar({
+						clearOnComplete: true,
+						hideCursor: true,
+						format: `{title} | ${c.magentaBright(`{bar}`)} | {percentage}% | ETA: {eta}s`,
+						barCompleteChar: `\u2588`,
+						barIncompleteChar: `\u2591`,
+					})
+				;
+
+				clips.forEach((element, index) => {
+					bars.push(multibar.create(100, 0, {title: f.title(element.title, yargs.full, 16).padEnd(20)}));
+
+					promises.push(new Promise(async (resolve, reject) => {
+						const d = new downloader({
+							url: f.getClip(element.thumbnail_url),
+							directory: `${docFolder}\\clips`,
+							cloneFiles: false,
+							skipExistingFileName: true,
+							onProgress: function (percentage) {
+								bars[index].update(+percentage);
+								bars[index].updateETA();
+							},
+						});
+
+						try {
+							await d.download();
+
+							resolve();
+						} catch (error) {
+							reject(error);
+						};
+					}));
+				});
+
+
+				Promise.all(promises)
+				.then(() => {
+					multibar.stop();
+
+					console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Download clips:`)} · ${c.bold.greenBright(`done!`)}`);
+				})
+				.catch(console.error);
+			break;
+			default:
+				let count = 1;
+
+				for (clip of clips) {
+					await f.GET(`games?id=${clip.game_id}`)
+					.then((game) => {
+						console.log(`#${count++}\t<<<${clip.id}\n\t${c.bold.magentaBright(clip.creator_name)} --- ${game.data[0].name} --- ${new Date(clip.created_at).toLocaleString()} --- ${moment(new Date(clip.created_at).getTime()).local().fromNow()} --- ${clip.duration}s --- ${c.bold.redBright(clip.view_count)}\n\t\t>>>${f.title(clip.title, yargs.full)}`);
+					});
+				};
+			break;
+		};
+	}
+)
+.command(`clips [username] [amount]`, `returns top clips`, (yargs) => {
+	yargs.positional(`username`, {
+		type: `string`,
+		default: auth.login,
+		required: false,
+		desc: ``,
+		coerce: (username) => {return username.toLowerCase()},
+	});
+	yargs.positional(`amount`, {
+		type: `number`,
+		default: 10,
+		required: false,
+		desc: ``,
+		coerce: (amount) => {
+			if (isNaN(amount)) f.returnError(`${c.underline(amount)} is Not a Number`);
+			if (amount > 100) f.returnError(`maximum is 100`);
+			if (amount < 1) f.returnError(`minimum is 1`);
+
+			return amount;
+		},
+	});
+	yargs.options({
+		"cp": {
+			boolean: true,
+			desc: `copy selected clips`,
+			required: false,
+			alias: [`c`, `copy`],
+		},
+		"op": {
+			boolean: true,
+			desc: `open selected clips`,
+			required: false,
+			alias: [`o`, `open`],
+		},
+		"dl": {
+			boolean: true,
+			desc: `download selected clips`,
+			required: false,
+			alias: [`d`, `download`],
+		},
+		"timeperiod": {
+			desc: `sort by timeperiod`,
+			required: false,
+			default: `w`,
+			alias: `t`,
+			choices: [`d`, `w`, `m`, `y`, `a`],
+		},	
+		"full": {
+			boolean: true,
+			desc: `show full titles`,
+			required: false,
+			alias: `f`,
+		},
+	});
+},
+	(yargs) => {
+		spinner.start();
+
+		f.GET(`users?login=${yargs.username}`)
+		.then((user) => {
+			if (user.data.length === 0) {
+				spinner.stop();
+
+				f.returnError(`there is no such username`);
+			};
+
+			f.GET(`clips?broadcaster_id=${user.data[0].id}&started_at=${(yargs.timeperiod == `a`) ? new Date(user.data[0].created_at).toISOString() : f.getDate(yargs.timeperiod)}&ended_at=${new Date().toISOString()}&first=${yargs.amount}`)
+			.then(async (clips) => {
+				let count = 1;
+				const choices = [];
+
+				// OLD IMPLEMENTAION OF CATEGORIES IN CLIPS
+				// get clips data
+				// go through all clips and gather their game ids and put it in array
+				// fetch their names through /games?id=...&id=... and return another array
+				// then for each clip find its game id in array and return game name
+				
+				spinner.stop();
+
+				if (clips.data.length === 0) {
+					console.log(c.bold.yellow.italic(`no clips found`));
+					process.exit(0);
+				};
+
+				for (clip of clips.data) {
+					await f.GET(`games?id=${clip.game_id}`)
+					.then(async (game) => {
+						const output = `#${count++}\t<<<${clip.id}\n\t${c.bold.magentaBright.bgBlack(clip.creator_name)} --- ${game.data[0].name} --- ${new Date(clip.created_at).toLocaleString()} --- ${moment(new Date(clip.created_at).getTime()).local().fromNow()} --- ${clip.duration}s --- ${c.bold.redBright(clip.view_count)}\n\t\t>>>${f.title(clip.title, yargs.full)}`;
+
+						(yargs.cp || yargs.op || yargs.dl) ? choices.push({name: output, value: clip}) : console.log(output);
+					});
+				};
+
+				if (yargs.cp || yargs.op || yargs.dl) {
+					enquirer.prompt({
+						type: `multiselect`,
+						name: `chosenClips`,
+						message: `Choose clips:`,
+						limit: yargs.amount,
+						choices: choices,
+						pointer: `>`,
+						emptyError: `${c.bold.redBright(`none were selected.`)}`,
+						footer: `\nUse ${c.bold.cyanBright(`↑/↓`)} keys with ${c.bold.cyanBright(`Space[ ⎵ ]`)} and ${c.bold.cyanBright(`Enter[ ↵ ]`)}.`,
+						styles: {
+							default: chalk.reset,
+							strong: chalk.bold.cyanBright,
+							primary: chalk.bold.greenBright,
+							em: chalk.bold.greenBright,
+							success: chalk.bold.greenBright,
+						},
+						indicator (state, choice) {
+							return ` ${choice.enabled ? `●` : `○`}`;
+						},
+						result (result) {
+							return Object.values(this.map(result));
+						},
+						format() {
+							// code straight from the module itself
+							// ugly i know, but dont wanna mess with it
+							if (!this.state.submitted || this.state.cancelled) return ``;
+							if (Array.isArray(this.selected) && this.selected.length > 0) {
+								return `${c.bold.greenBright(`done!`)}`;
+							}
+							return;
+						},
+					}).then(async (result) => {
+						switch (true) {
+							case yargs.cp:
+								spinner.start(`Copying values...`);
+
+								const copies = [];
+
+								for (clip of result.chosenClips) {
+									copies.push(clip.url);
+								};
+
+								f.copy(copies)
+								.then(() => {
+									spinner.stop();
+
+									console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Copy clips:`)} · ${c.bold.greenBright(`done!`)}`);
+								})
+								.catch(() => {f.returnError(`couldnt copy values`)});
+							break;
+							case yargs.op:
+								for (clip of result.chosenClips) {
+									await open(clip.url);
+								};
+
+								console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Open clips:`)} · ${c.bold.greenBright(`done!`)}`);
+							break;
+							case yargs.dl: 						
+								const 
+									promises = [],
+									bars = [],
+									multibar = new cliProgress.MultiBar({
+										clearOnComplete: true,
+										hideCursor: true,
+										format: `{title} | ${c.magentaBright(`{bar}`)} | {percentage}% | ETA: {eta}s`,
+										barCompleteChar: `\u2588`,
+										barIncompleteChar: `\u2591`,
+									})
+								;
+
+								result.chosenClips.forEach((element, index) => {
+									bars.push(multibar.create(100, 0, {title: f.title(element.title, yargs.full, 16).padEnd(20)}));
+
+									promises.push(new Promise(async (resolve, reject) => {
+										const d = new downloader({
+											url: f.getClip(element.thumbnail_url),
+											directory: `${docFolder}\\clips`,
+											cloneFiles: false,
+											skipExistingFileName: true,
+											onProgress: function (percentage) {
+												bars[index].update(+percentage);
+												bars[index].updateETA();
+											},
+										});
+
+										try {
+											await d.download();
+
+											resolve();
+										} catch (error) {
+											reject(error);
+										};
+									}));
+								});
+
+
+								Promise.all(promises)
+								.then(() => {
+									multibar.stop();
+
+									console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Download clips:`)} · ${c.bold.greenBright(`done!`)}`);
+								})
+								.catch(console.error);
+							break;
+						};
+					})
+					.catch(() => {process.exit(0)});
+				};
+			});
+		});
+	}
+)
+.example(`clip/clips`, `[#]\t<<<[id]\n\t${c.bold.magentaBright(`[username]`)} --- [category] --- [created at] --- [createage] --- [duration] --- ${c.bold.redBright(`[viewcount]`)}\n\t\t>>>[title]`)
+.command(`vods [username] [amount]`, `returns vods`, (yargs) => {
+	yargs.positional(`username`, {
+		type: `string`,
+		default: auth.login,
+		required: false,
+		desc: ``,
+		coerce: (username) => {return username.toLowerCase()},
+	});
+	yargs.positional(`amount`, {
+		type: `number`,
+		default: 10,
+		required: false,
+		desc: ``,
+		coerce: (amount) => {
+			if (isNaN(amount)) f.returnError(`${c.underline(amount)} is Not a Number`);
+			if (amount > 100) f.returnError(`maximum is 100`);
+			if (amount < 1) f.returnError(`minimum is 1`);
+
+			return amount;
+		},
+	});
+	yargs.options({
+		"op": {
+			desc: `open selected vods`,
+			required: false,
+			alias: `open`,
+		},
+		"dl": {
+			desc: `download selected vods`,
+			required: false,
+			alias: `download`,
+		},
+		"quality": {
+			desc: `selected quality`,
+			required: false,
+			default: `source`,
+			alias: `q`,
+			choices: [`source`, `1080p60`, `720p60`, `720p`, `480p`, `360p`, `160p`],
+		},	
+		"full": {
+			boolean: true,
+			desc: `show full titles`,
+			required: false,
+			alias: `f`,
+		},
+	});
+},
+	(yargs) => {
+		spinner.start();
+
+		f.GET(`users?login=${yargs.username}`)
+		.then((user) => {
+			if (user.data.length === 0) {
+				spinner.stop();
+
+				f.returnError(`there is no such username`);
+			};
+
+			f.GET(`videos?user_id=${user.data[0].id}&sort=time&period=all&first=${yargs.amount}`)
+			.then(async (vods) => {
+				let count = 1;
+				const choices = [];
+				
+				spinner.stop();
+
+				if (vods.data.length === 0) {
+					console.log(c.bold.yellow.italic(`no vods found`));
+					process.exit(0);
+				};
+
+				for (vod of vods.data) {
+					const output = `#${count++}\t${c.bold.magentaBright.bgBlack(vod.id)} --- ${new Date(vod.created_at).toLocaleString()} --- ${moment(new Date(vod.created_at).getTime()).local().fromNow()} --- ${vod.duration} --- ${c.bold.redBright(vod.view_count)}\n\t\t>>>${f.title(vod.title, yargs.full)}`;
+
+					(yargs.cp || yargs.op || yargs.dl) ? choices.push({name: output, value: vod}) : console.log(output);
+				};
+
+				if (yargs.cp || yargs.op || yargs.dl) {
+					enquirer.prompt({
+						type: `multiselect`,
+						name: `chosenVods`,
+						message: `Choose vods:`,
+						limit: yargs.amount,
+						choices: choices,
+						pointer: `>`,
+						emptyError: `${c.bold.redBright(`none were selected.`)}`,
+						footer: `\nUse ${c.bold.cyanBright(`↑/↓`)} keys with ${c.bold.cyanBright(`Space[ ⎵ ]`)} and ${c.bold.cyanBright(`Enter[ ↵ ]`)}.`,
+						styles: {
+							default: chalk.reset,
+							strong: chalk.bold.cyanBright,
+							primary: chalk.bold.greenBright,
+							em: chalk.bold.greenBright,
+							success: chalk.bold.greenBright,
+						},
+						indicator (state, choice) {
+							return ` ${choice.enabled ? `●` : `○`}`;
+						},
+						result (result) {
+							return Object.values(this.map(result));
+						},
+						format() {
+							if (!this.state.submitted || this.state.cancelled) return ``;
+							if (Array.isArray(this.selected) && this.selected.length > 0) {
+								return `${c.bold.greenBright(`done!`)}`;
+							}
+							return;
+						},
+					}).then(async (result) => {
+						switch (true) {
+							case yargs.cp:
+								spinner.start(`Copying values...`);
+
+								const copies = [];
+
+								for (vod of result.chosenVods) {
+									copies.push(vod.url);
+								};
+
+								f.copy(copies)
+								.then(() => {
+									spinner.stop();
+
+									console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Copy vods:`)} · ${c.bold.greenBright(`done!`)}`);
+								})
+								.catch(() => {f.returnError(`couldnt copy values`)});
+							break;
+							case yargs.op:
+								for (vod of result.chosenVods) {
+									await open(vod.url);
+								};
+
+								console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Open vods:`)} · ${c.bold.greenBright(`done!`)}`);
+							break;
+							case yargs.dl:
+								const 
+									promises = [],
+									bars = [],
+									multibar = new cliProgress.MultiBar({
+										clearOnComplete: true,
+										hideCursor: true,
+										format: `{title} | ${c.magentaBright(`{bar}`)} | {percentage}% | ETA: {eta_formatted}`,
+										barCompleteChar: `\u2588`,
+										barIncompleteChar: `\u2591`,
+										etaBuffer: 64,
+									})
+								;
+								
+								if (!commandExistsSync(`ffmpeg`)) {
+									console.clear();
+									f.returnError(`ffmpeg was not found`);
+								};
+
+								result.chosenVods.forEach((element, index) => {
+									bars.push(multibar.create(100, 0, {title: f.title(element.title, yargs.full, 29).padEnd(32)}));
+
+									if (!fs.existsSync(`${docFolder}\\vods`)) fs.mkdirSync(`${docFolder}\\vods`);
+
+									promises.push(new Promise(async (resolve, reject) => {
+										await new m3u8ToMp4().setInputFile(f.getVod(element.thumbnail_url, yargs.quality)).setOutputFile(`${docFolder}\\vods\\${element.id}.mp4`).start(null, (percentage) => {
+											bars[index].update((percentage > 0) ? +percentage : 0);
+											bars[index].updateETA();
+										})
+										.then(() => resolve());
+									}));
+								});
+
+								Promise.all(promises)
+								.then(() => {
+									multibar.stop();
+
+									console.log(`${c.bold.greenBright(`\u2714`)} ${c.bold.cyanBright(`Download vods:`)} · ${c.bold.greenBright(`done!`)}`);
+								})
+								.catch(console.error);
+							break;
+						};
+
+					})
+					.catch(() => {process.exit(0)});
+				};
+			});
+		});
+	}
+)
+.example(`vods`, `[#]\t${c.bold.magentaBright(`[id]`)} --- [started at] --- [startedage] --- [duration] --- ${c.bold.redBright(`[viewcount]`)}\n\t\t>>>[title]`)
+.command(`about`, ``, () => {}, (yargs) => {console.log(`${c.bold.yellowBright(`tickly`)} ${c.bold.greenBright(version)} @ ${c.bold.redBright(build)}\ntwitch command-line interface\n\n${c.cyanBright.underline(`https://github.com/eAlexandrohin/tickly\nhttps://www.npmjs.com/package/tickly`)}\n\n${c.bold.magentaBright(`@ealexandrohin`)}\n\n${c.italic(`MIT License`)}`)})
 .version(version).alias(`--version`, `-v`).help().alias(`--help`, `-h`).argv;
+
+
+
+// DEPRECATION UPDATE
+
+// .command(`follows`, `returns your follows`, () => {},
+// 	(yargs) => {
+// 		const result = [];
+
+// 		f.GET(`channels/followed?user_id=${auth.id}&first=100`)
+// 		.then((follows) => {
+// 			result.push(...follows.data);
+// 			let cursor = follows.pagination.cursor;
+
+// 			(async () => {
+// 				while (cursor) {
+// 					await f.GET(`channels/followed?user_id=${auth.id}&first=100&after=${cursor}`)
+// 					.then((res) => {
+// 						result.push(...res.data);
+// 						cursor = res.pagination.cursor;
+// 					});
+// 				};
+				
+// 				for (follow of result) {
+// 					console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.broadcaster_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
+// 				};
+// 			})();
+// 		});
+// 	}
+// )

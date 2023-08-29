@@ -22,10 +22,8 @@
         </div>
         <a href="https://github.com/eAlexandrohin/tickly" id="name">tickly</a>
     </section>
-	<script>
-		const url = window.location.hash;
-		const token = url.substring(14, 44);
-		document.getElementById("token").innerHTML = token;
-	</script>  
+    <script>
+        document.getElementById("token").innerHTML = window.location.hash.substring(14, 44);
+    </script>
 </body>
 </html>
