@@ -24,6 +24,7 @@
     "nodejs-file-downloader": "^4.12.1",
     "open": "^8.4.2",
     "ora": "^5.4.1",
+    "twitch-m3u8": "^1.1.5",
     "yargs": "^17.6.2"
   }
 }
