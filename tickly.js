@@ -133,8 +133,8 @@ let auth;
 if (!fs.existsSync(`${docFolder}\\auth.json`) && (!process.argv[2] || process.argv[2].toLowerCase() != `auth`)) {f.returnError(`no auth`)};
 if (fs.existsSync(`${docFolder}\\auth.json`)) {auth = require(`${docFolder}\\auth.json`)};
 
+// MAIN ENTRY POINT
 try {
-	// MAIN ENTRY POINT
 	yargs
 
 	.check(async (argv) => {
@@ -1266,7 +1266,7 @@ try {
 	.command(`about`, ``, () => {}, (yargs) => {console.log(`${c.bold.yellowBright(`tickly`)} ${c.bold.greenBright(version)} @ ${c.bold.redBright(build)}\ntwitch command-line interface\n\n${c.cyanBright.underline(`https://github.com/eAlexandrohin/tickly\nhttps://www.npmjs.com/package/tickly`)}\n\n${c.bold.magentaBright(`@ealexandrohin`)}\n\n${c.italic(`MIT License`)}`)})
 	.version(version).alias(`--version`, `-v`).help().alias(`--help`, `-h`).argv;
 } catch (error) {
-	require(`fs`).writeFileSync(`${docFolder}\\tickly.log`, JSON.stringify(error, null, 4));
+	require(`fs`).writeFileSync(`${docFolder}\\tickly.log`, JSON.stringify(error, Object.getOwnPropertyNames(error), 4));
 
 	console.log(`${c.bold.redBright(`Error`)}: something went terribly wrong.\nPlease, report this issue by sending in ${c.bold.bgYellow(`tickly.log`)} file in ${c.bold.bgCyan(docFolder)} at:\n${c.underline.yellowBright(`https://github.com/eAlexandrohin/tickly/issues`)}`);
 };
