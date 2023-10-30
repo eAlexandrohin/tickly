@@ -311,7 +311,39 @@ try {
 		async () => {
 			spinner.start();
 
-			require(`express`)().get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\auth.html`)).use(require(`express`).static(`${f.getDir()}\\front\\`)).listen(8989);
+			const 
+				csrf = new require('csrf')().secretSync(),
+				app = require(`express`)()
+			;
+
+			let auth;
+
+			// require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
+			// require(`express`)().get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\auth.html`)).use(require(`express`).static(`${f.getDir()}\\front\\`)).listen(8989);
+
+			app.get(`/back`, (req, res) => {
+				auth = req.query;
+				res.redirect(`/`);
+			});
+
+			// app.get(`/`, (req, res) => {
+			// });
+
+			app.get(`/front`, (req, res) => {
+				fetch(`https://id.twitch.tv/oauth2/token
+					?client_id=obv6hgz6i68ofah3zvwo442j1o58dj
+					&client_secret=nac5pnnjjl7ws742n8gy6sus5nu8y4
+					&code=${auth.code}
+					&grant_type=authorization_code
+					&redirect_uri=http://localhost:8989`, {method: `POST`})
+				.then((response) => response.json())
+				.then((data) => {
+					res.status(200).json(data);
+				})
+				.catch((error) => reject(error));
+			});
+
+			app.listen(8989);
 
 			spinner.stop();
 
@@ -336,26 +368,29 @@ try {
 
 				console.log(`${c.bold.magentaBright(`Auth`)}: opening browser...\u001B[?25h`);
 
-				open(`https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&redirect_uri=http://localhost:8989&scope=user:read:follows+user:edit:follows`);
+				require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
 
-				require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`${c.bold.cyanBright(`Paste your token`)}: `, (token) => {
+				require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`${c.bold.cyanBright(`Paste your token`)}: `, (both) => {
+					const tokens = both.split(`;`);
+
 					fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 						headers: {
 							'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
-							'authorization': `Bearer ${token}`,
+							'authorization': `Bearer ${tokens[0]}`,
 						}
 					})
 					.then((response) => response.json())
 					.then((auth) => {
 						if (auth.hasOwnProperty(`error`)) {f.returnError(`invalid token`)};
 
-						auth.data[0].token = token;
+						auth.data[0].token = tokens[0];
+						auth.data[0].refresh = tokens[1];
 
 						if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
 						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, `\t`));
 
 						console.log(c.bold.greenBright(`Success!`));
-						process.exit(0);
+						process.exit(0);	
 					});
 				});
 			})

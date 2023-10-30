@@ -134,3 +134,6 @@ bin
 *.exe
 *.env
 config.json
+logo.js
+t.js
+build.*

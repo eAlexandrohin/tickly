@@ -4,7 +4,7 @@
   "description": "twitch command line interface",
   "main": "tickly.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "run": "node tickly.js"
   },
   "keywords": [
     "CLI"
@@ -17,6 +17,7 @@
     "cli-progress": "^3.12.0",
     "command-exists": "^1.2.9",
     "copy-paste": "^1.5.3",
+    "csrf": "^3.1.0",
     "enquirer": "^2.3.6",
     "express": "^4.18.2",
     "m3u8-to-mp4-progress": "^1.0.5",
