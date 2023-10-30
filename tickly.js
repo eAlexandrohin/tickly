@@ -326,8 +326,8 @@ try {
 				res.redirect(`/`);
 			});
 
-			// app.get(`/`, (req, res) => {
-			// });
+			app.use(require(`express`).static(`${f.getDir()}\\front\\`));
+			app.get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\index.html`));
 
 			app.get(`/front`, (req, res) => {
 				fetch(`https://id.twitch.tv/oauth2/token
@@ -390,7 +390,7 @@ try {
 						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, `\t`));
 
 						console.log(c.bold.greenBright(`Success!`));
-						process.exit(0);	
+						process.exit(0);
 					});
 				});
 			})
