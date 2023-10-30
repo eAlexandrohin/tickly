@@ -1,0 +1,86 @@
+$Primary: #ffbf00;
+$TwitchPurple: #9146ff;
+$HyperRed: #fd6f6b;
+$HyperBlue: #68fdfe;
+$HyperGreen: #67f86f;
+
+* {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  outline: none;
+  font-family: 'Montserrat', sans-serif;
+  box-sizing: border-box;
+  overflow: hidden; //!!!!!!
+
+  -youbkit-touch-callout: none; /* Сафари для iOS */
+  -youbkit-user-select: none; /* Chrome 6.0+, Safari 3.1+, Edge и Opera 15+ */
+  -moz-user-select: none; /* Fire Fox */
+  -ms-user-select: none; /* IE 10+ и Edge */
+  user-select: none;
+}
+
+html {
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  color: #ffffff;
+  background-color: #000000;
+}
+
+a,
+span,
+p,
+b,
+h1,
+h2,
+h3,
+h4,
+h5 {
+  color: #ffffff;
+}
+
+h1 {
+  font-size: 48px;
+}
+
+h2 {
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 30px;
+}
+
+a {
+  text-decoration: none;
+}
+
+@mixin noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+  -webkit-user-select: none; /* Safari */
+  -khtml-user-select: none; /* Konqueror HTML */
+  -moz-user-select: none; /* Old versions of Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+  user-select: none; /* Non-prefixed version, currently
+  supported by Chrome, Opera and Firefox */
+}
+
+// Плавное появление popup через react-transition-group
+
+.alert-enter {
+  opacity: 0;
+}
+.alert-enter-active {
+  opacity: 1;
+  transition: opacity 200ms;
+}
+.alert-exit {
+  opacity: 1;
+}
+.alert-exit-active {
+  opacity: 0;
+  transition: opacity 200ms;
+}

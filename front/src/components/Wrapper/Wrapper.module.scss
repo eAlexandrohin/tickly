@@ -1,0 +1,21 @@
+@import '../../index.scss';
+
+.root {
+  position: relative;
+  z-index: 0;
+  margin: 5vh auto;
+  width: 95vw;
+  height: 90vh;
+  border-radius: 32px;
+  background-color: $TwitchPurple;
+
+  .backgroundFont {
+    position: absolute;
+
+    p {
+      word-break: break-all;
+      color: #000;
+      font-weight: 900;
+    }
+  }
+}
