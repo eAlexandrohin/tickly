@@ -1,3 +1,5 @@
+require(`dotenv`).config();
+
 const
 	yargs = require(`yargs`),
 	c = require(`ansi-colors`),
@@ -18,7 +20,7 @@ const
 
 // todo:
 // make use of users chat color
-const 
+const
 	version = `v3.0.0`,
 	build = `2023-08-29T21:50:51.888Z` // build time
 ;
@@ -27,8 +29,8 @@ const f = {
 	GET: (path) => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/${path}`, {method: `GET`,
 			headers: {
-				'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
-				'authorization': `Bearer ${auth.token}`,
+				"client-id": process.env.CLIENT,
+				"authorization": `Bearer ${auth.token}`,
 			}
 		})
 		.then((response) => response.json())
@@ -46,12 +48,30 @@ const f = {
 	checkAuth: () => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 			headers: {
-				'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
-				'authorization': `Bearer ${auth.token}`,
+				"client-id": process.env.CLIENT,
+				"authorization": `Bearer ${auth.token}`,
 			}
 		})
 		.then((response) => response.json())
-		.then((data) => (data.error === `Unauthorized`) ? console.log(`${c.bold.redBright(`Error`)}: your token is invalid.\nUse \"${c.bgMagenta.italic(`tickly auth`)}\" for reauth.`) : resolve(true));
+		.then((data) => {
+			if (data.error === `Unauthorized`) {
+				if (auth.hasOwnProperty(`token`) && auth.hasOwnProperty(`refresh`)) {
+					fetch(`https://id.twitch.tv/oauth2/token?client_id=${process.env.CLIENT}&client_secret=${process.env.SECRET}&grant_type=refresh_token&refresh_token=${auth.refresh}`, {method: `POST`})
+					.then((response) => response.json())
+					.then((data) => {
+						console.log(`yo`, data);
+
+						auth.token = data.access_token;
+						auth.refresh = data.refresh_token;
+
+						if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
+						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth, null, 4));
+					});
+				} else {f.returnError(`no auth`)};
+			};
+
+			resolve(true);
+		});
 	}),
 	checkURLs: (links) => {
 		let count = 0;
@@ -270,7 +290,7 @@ try {
 													return ` ${choice.enabled ? `●` : `○`}`;
 												},
 												format() {
-													if (!this.state.submitted || this.state.cancelled) return '';
+													if (!this.state.submitted || this.state.cancelled) return ``;
 													return c.bold.greenBright(`done!`);
 												},
 											}).then(async (result) => {
@@ -312,7 +332,7 @@ try {
 			spinner.start();
 
 			const 
-				csrf = new require('csrf')().secretSync(),
+				csrf = new require(`csrf`)().secretSync(),
 				app = require(`express`)()
 			;
 
@@ -331,8 +351,8 @@ try {
 
 			app.get(`/front`, (req, res) => {
 				fetch(`https://id.twitch.tv/oauth2/token
-					?client_id=obv6hgz6i68ofah3zvwo442j1o58dj
-					&client_secret=nac5pnnjjl7ws742n8gy6sus5nu8y4
+					?client_id=${process.env.CLIENT}
+					&client_secret=${process.env.SECRET}
 					&code=${auth.code}
 					&grant_type=authorization_code
 					&redirect_uri=http://localhost:8989`, {method: `POST`})
@@ -368,15 +388,15 @@ try {
 
 				console.log(`${c.bold.magentaBright(`Auth`)}: opening browser...\u001B[?25h`);
 
-				require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
+				require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${process.env.CLIENT}&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
 
 				require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`${c.bold.cyanBright(`Paste your token`)}: `, (both) => {
 					const tokens = both.split(`;`);
 
 					fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 						headers: {
-							'client-id': `obv6hgz6i68ofah3zvwo442j1o58dj`,
-							'authorization': `Bearer ${tokens[0]}`,
+							"client-id": process.env.CLIENT,
+							"authorization": `Bearer ${tokens[0]}`,
 						}
 					})
 					.then((response) => response.json())
@@ -387,7 +407,7 @@ try {
 						auth.data[0].refresh = tokens[1];
 
 						if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
-						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, `\t`));
+						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, 4));
 
 						console.log(c.bold.greenBright(`Success!`));
 						process.exit(0);
@@ -437,72 +457,98 @@ try {
 			});
 		}
 	)
-	.example(`follows`, `[#]\t${c.bold.magentaBright(`[follow]`)} --- [followed at] --- [followage]`)
-	.command(`follows [username]`, `returns [username] follows`, (yargs) => {
-		yargs.positional(`username`, {
-			type: `string`,
-			default: auth.login,
-			desc: `default is your username`,
-			coerce: (username) => {return username.toLowerCase()},
-		});
-	},
+	.command(`follows`, `returns your follows`, () => {},
+		// DEPRECATION UPDATE
 		(yargs) => {
 			const result = [];
 
-			f.GET(`users?login=${yargs.username}`)
-			.then((user) => {
-				if (user.data.length === 0) f.returnError(`there is no such username`);
+			f.GET(`channels/followed?user_id=${auth.id}&first=100`)
+			.then((follows) => {
+				result.push(...follows.data);
+				let cursor = follows.pagination.cursor;
 
-				f.GET(`users/follows?from_id=${user.data[0].id}&first=100`)
-				.then((follows) => {
-					result.push(...follows.data);
-					let cursor = follows.pagination.cursor;
+				(async () => {
+					while (cursor) {
+						await f.GET(`channels/followed?user_id=${auth.id}&first=100&after=${cursor}`)
+						.then((res) => {
+							result.push(...res.data);
+							cursor = res.pagination.cursor;
+						});
+					};
+					
+					for (follow of result) {
+						console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.broadcaster_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
+					};
+				})();
+			});
+		}
+	)
+	// .example(`follows`, `[#]\t${c.bold.magentaBright(`[follow]`)} --- [followed at] --- [followage]`)
+	// .command(`follows [username]`, `returns [username] follows`, (yargs) => {
+	// 	yargs.positional(`username`, {
+	// 		type: `string`,
+	// 		default: auth.login,
+	// 		desc: `default is your username`,
+	// 		coerce: (username) => {return username.toLowerCase()},
+	// 	});
+	// },
+	// 	(yargs) => {
+	// 		const result = [];
 
-					(async () => {
-						while (cursor) {
-							await f.GET(`users/follows?from_id=${user.data[0].id}&first=100&after=${cursor}`)
-							.then((res) => {
-								result.push(...res.data);
-								cursor = res.pagination.cursor;
-							});
-						};
+	// 		f.GET(`users?login=${yargs.username}`)
+	// 		.then((user) => {
+	// 			if (user.data.length === 0) f.returnError(`there is no such username`);
+
+	// 			f.GET(`users/follows?from_id=${user.data[0].id}&first=100`)
+	// 			.then((follows) => {
+	// 				result.push(...follows.data);
+	// 				let cursor = follows.pagination.cursor;
+
+	// 				(async () => {
+	// 					while (cursor) {
+	// 						await f.GET(`users/follows?from_id=${user.data[0].id}&first=100&after=${cursor}`)
+	// 						.then((res) => {
+	// 							result.push(...res.data);
+	// 							cursor = res.pagination.cursor;
+	// 						});
+	// 					};
 						
-						for (follow of result) {
-							console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.to_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
-						};
-					})();
-				});
-			})
-		}
-	)
-	.example(`following`, `${c.bold.greenBright(`[boolean]`)} --- ${c.bold.magentaBright(`[from]`)} >>> ${c.bold.magentaBright(`[to]`)} --- [followed at] --- [followage]`)
-	.command(`following <from> <to>`, `returns boolean if <from> follows <to>`, (yargs) => {
-		yargs.positional(`from`, {
-			type: `string`,
-			required: true,
-			desc: `who is following`,
-			coerce: (from) => {return from.toLowerCase()},
-		});
-		yargs.positional(`to`, {
-			type: `string`,
-			required: true,
-			desc: `whom is followed`,
-			coerce: (to) => {return to.toLowerCase()},
-		});
-	},
-		(yargs) => {
-			f.GET(`users?login=${yargs.from}&login=${yargs.to}`)
-			.then((users) => {
-				if (users.data.length === 0) f.returnError(`"${yargs.from}" and "${yargs.to}" are not found`);
-				if (users.data.length !== 2) (users.data[0].login === yargs.from) ? f.returnError(`"${yargs.to}" is not found`) : f.returnError(`"${yargs.from}" is not found`);
+	// 					for (follow of result) {
+	// 						console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.to_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
+	// 					};
+	// 				})();
+	// 			});
+	// 		})
+	// 	}
+	// )
+	// .example(`following`, `${c.bold.greenBright(`[boolean]`)} --- ${c.bold.magentaBright(`[from]`)} >>> ${c.bold.magentaBright(`[to]`)} --- [followed at] --- [followage]`)
+	// .command(`following <from> <to>`, `returns boolean if <from> follows <to>`, (yargs) => {
+	// 	yargs.positional(`from`, {
+	// 		type: `string`,
+	// 		required: true,
+	// 		desc: `who is following`,
+	// 		coerce: (from) => {return from.toLowerCase()},
+	// 	});
+	// 	yargs.positional(`to`, {
+	// 		type: `string`,
+	// 		required: true,
+	// 		desc: `whom is followed`,
+	// 		coerce: (to) => {return to.toLowerCase()},
+	// 	});
+	// },
+	// 	(yargs) => {
+	// 		f.GET(`users?login=${yargs.from}&login=${yargs.to}`)
+	// 		.then((users) => {
+	// 			if (users.data.length === 0) f.returnError(`"${yargs.from}" and "${yargs.to}" are not found`);
+	// 			if (users.data.length !== 2) (users.data[0].login === yargs.from) ? f.returnError(`"${yargs.to}" is not found`) : f.returnError(`"${yargs.from}" is not found`);
 
-				f.GET(`users/follows?from_id=${users.data[0].id}&to_id=${users.data[1].id}`)
-				.then((following) => {
-					(!!(following.data[0])) ? console.log(`${c.bold.greenBright(`true`)} --- ${c.bold.magentaBright(following.data[0].from_login)} >>> ${c.bold.magentaBright(following.data[0].to_login)} --- ${new Date(following.data[0].followed_at).toLocaleString()} --- ${moment(new Date(following.data[0].followed_at).getTime()).local().fromNow()}`) : console.log(`${c.bold.redBright(`false`)}`);
-				});
-			})
-		}
-	)
+	// 			f.GET(`users/follows?from_id=${users.data[0].id}&to_id=${users.data[1].id}`)
+	// 			.then((following) => {
+	// 				(!!(following.data[0])) ? console.log(`${c.bold.greenBright(`true`)} --- ${c.bold.magentaBright(following.data[0].from_login)} >>> ${c.bold.magentaBright(following.data[0].to_login)} --- ${new Date(following.data[0].followed_at).toLocaleString()} --- ${moment(new Date(following.data[0].followed_at).getTime()).local().fromNow()}`) : console.log(`${c.bold.redBright(`false`)}`);
+	// 			});
+	// 		})
+	// 	}
+	// )
 	.example(`team`, `${c.bold.magentaBright(`[name]`)} --- [created at] ::: [createage] >>> [updated at] ::: [updateage]`)
 	.command(`team <team>`, `returns data about <team>`, (yargs) => {
 		yargs.positional(`team`, {
@@ -1305,31 +1351,3 @@ try {
 
 	console.log(`${c.bold.redBright(`Error`)}: something went terribly wrong.\nPlease, report this issue by sending in ${c.bold.bgYellow(`tickly.log`)} file in ${c.bold.bgCyan(docFolder)} at:\n${c.underline.yellowBright(`https://github.com/eAlexandrohin/tickly/issues`)}`);
 };
-
-// DEPRECATION UPDATE
-
-// .command(`follows`, `returns your follows`, () => {},
-// 	(yargs) => {
-// 		const result = [];
-
-// 		f.GET(`channels/followed?user_id=${auth.id}&first=100`)
-// 		.then((follows) => {
-// 			result.push(...follows.data);
-// 			let cursor = follows.pagination.cursor;
-
-// 			(async () => {
-// 				while (cursor) {
-// 					await f.GET(`channels/followed?user_id=${auth.id}&first=100&after=${cursor}`)
-// 					.then((res) => {
-// 						result.push(...res.data);
-// 						cursor = res.pagination.cursor;
-// 					});
-// 				};
-				
-// 				for (follow of result) {
-// 					console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.broadcaster_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
-// 				};
-// 			})();
-// 		});
-// 	}
-// )
