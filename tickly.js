@@ -1,20 +1,20 @@
 require(`dotenv`).config();
 
 const
-	yargs = require(`yargs`),
-	c = require(`ansi-colors`),
-	moment = require(`moment`),
 	fs = require(`fs`),
-	enquirer = require(`enquirer`),
-	spinner = require(`ora`)({text: `Loading...`, color: `magentaBright`}),
-	open = require(`open`),
+	c = require(`ansi-colors`),
 	chalk = require(`chalk`),
-	twitch_m3u8 = require(`twitch-m3u8`),
-	ncp = require(`copy-paste`),
 	cliProgress = require(`cli-progress`),
-	downloader = require(`nodejs-file-downloader`),
-	m3u8ToMp4 = require(`m3u8-to-mp4-progress`),
 	commandExistsSync = require(`command-exists`).sync,
+	ncp = require(`copy-paste`),
+	enquirer = require(`enquirer`),
+	m3u8ToMp4 = require(`m3u8-to-mp4-progress`),
+	moment = require(`moment`),
+	downloader = require(`nodejs-file-downloader`),
+	open = require(`open`),
+	spinner = require(`ora`)({text: `Loading...`, color: `magentaBright`}),
+	twitch_m3u8 = require(`twitch-m3u8`),
+	yargs = require(`yargs`),
 	docFolder = `${require(`os`).userInfo().homedir}\\Documents\\tickly`
 ;
 
