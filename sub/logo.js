@@ -1,7 +1,12 @@
+'use strict';
+
 const
-	u = `\u2B24 `,
-	rl = require(`readline`),
+	u = `\u2B24 `, // pacman
+	h = `\u001B[?25l`, // hide cursor
+	sh = `\u001B[?25h`, // show cursor
 	c = require(`ansi-colors`).theme({y: require(`ansi-colors`).bold.yellow}),
+	rl = require(`node:readline`),
+	rli = rl.createInterface(process.stdin, process.stdout),
 	sleep = (ms) => {return new Promise((resolve) => {setTimeout(resolve, ms)})},
 	t = [
 		`ti${c.y(u)}kly`,
@@ -20,22 +25,39 @@ let status = true;
 module.exports = {
 	start: async () => {
 		while (status) {
-			for await (const state of t) {
-				process.stdout.write(state);
+			for await (const s of t) {
+				rli.write(h);
 
-				await sleep(500);
-
+				rl.clearLine();
+				rl.cursorTo(process.stdout, 0);
+				
+				// process.stdout.clearLine();
+				// process.stdout.cursorTo(0);
 				// rl.moveCursor(0, -1);
-				process.stdout.clearLine();
-				process.stdout.cursorTo(0);
+				
+				rli.write(s);
+				
+				await sleep(500);
 			}
 		}
+	},
+	pause: () => {
+		status = false;
+
+		rl.write(sh);
 	},
 	stop: () => {
 		status = false;
 
+		rl.clearLine();
+		rl.cursorTo(process.stdout, 0);
+
+		rli.write(sh);
+
+		// process.stdout.clearLine();
+		// process.stdout.cursorTo(0);
 		// rl.moveCursor(0, -1);
-		rl.clearLine();
-		rl.clearLine();
-	},	
+		// rl.clearLine();
+		// rl.clearLine();
+	},
 };
