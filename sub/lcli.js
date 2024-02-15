@@ -31,10 +31,6 @@ module.exports = {
 				rl.clearLine();
 				rl.cursorTo(process.stdout, 0);
 				
-				// process.stdout.clearLine();
-				// process.stdout.cursorTo(0);
-				// rl.moveCursor(0, -1);
-				
 				rli.write(s);
 				
 				await sleep(500);
@@ -53,11 +49,5 @@ module.exports = {
 		rl.cursorTo(process.stdout, 0);
 
 		rli.write(sh);
-
-		// process.stdout.clearLine();
-		// process.stdout.cursorTo(0);
-		// rl.moveCursor(0, -1);
-		// rl.clearLine();
-		// rl.clearLine();
 	},
 };
