@@ -1,7 +1,5 @@
 `use strict`;
 
-require(`dotenv`).config();
-
 const
 	fs = require(`fs`),
 	c = require(`ansi-colors`),
@@ -24,14 +22,14 @@ const
 // make use of users chat color
 const
 	version = `v3.0.0`,
-	build = `2023-08-29T21:50:51.888Z` // build time
+	build = `2024-08-13T22:48:59.280Z` // build time, original is 2023-08-29T21:50:51.888Z
 ;
 
 const f = {
 	GET: (path) => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/${path}`, {method: `GET`,
 			headers: {
-				"client-id": process.env.CLIENT,
+				"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
 				"authorization": `Bearer ${auth.token}`,
 			}
 		})
@@ -40,17 +38,26 @@ const f = {
 		.catch((error) => reject(error))
 	}),
 	checkInternet: () => new Promise((resolve, reject) => {
-		require(`dns`).resolve(`www.google.com`, (err) => (err) ? f.returnError(`no internet`) : resolve(true));
+		require(`node:dns`).promises.resolve(`www.google.com`)
+		.then(resolve(true))
+		.catch(reject(`no internet`));
 	}),
 	checkUpdates: () => new Promise((resolve, reject) => {
 		fetch(`https://api.github.com/repos/ealexandrohin/tickly/releases`, {method: `GET`})
 		.then((response) => response.json())
-		.then((data) => (data.hasOwnProperty(`message`)) ? console.log(`${c.bold.redBright(`Error`)}: repo is not found.`) : (data[0].tag_name === version) ? resolve(true) : console.log(`Update avaliable: ${c.bold.redBright(data[0].tag_name)}\nYou can update by running: ${c.bgMagenta.italic(`tickly update`)}\nSee: ${c.yellowBright.underline(`https://github.com/ealexandrohin/tickly/releases/latest`)}`));
+		.then((data) => {
+			if (data.hasOwnProperty(`message`)) console.log(`${c.bold.redBright(`Error`)}: repo is not found.\nContact ${c.bold.yellowBright(`@ealexandrohin`)}\n`);
+
+			if (!data.hasOwnProperty(`message`) && data[0].tag_name !== version) console.log(`Update avaliable: ${c.bold.redBright(data[0].tag_name)}\nYou can update by running: ${c.bgMagenta.italic(`tickly update`)}\nSee: ${c.yellowBright.underline(`https://github.com/ealexandrohin/tickly/releases/latest`)}\n`);
+
+			resolve(true);
+		})
+		.catch((error) => reject(error));
 	}),
 	checkAuth: () => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 			headers: {
-				"client-id": process.env.CLIENT,
+				"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
 				"authorization": `Bearer ${auth.token}`,
 			}
 		})
@@ -58,10 +65,10 @@ const f = {
 		.then((data) => {
 			if (data.error === `Unauthorized`) {
 				if (auth.hasOwnProperty(`token`) && auth.hasOwnProperty(`refresh`)) {
-					fetch(`https://id.twitch.tv/oauth2/token?client_id=${process.env.CLIENT}&client_secret=${process.env.SECRET}&grant_type=refresh_token&refresh_token=${auth.refresh}`, {method: `POST`})
+					fetch(`https://id.twitch.tv/oauth2/token?client_id=${`n15gmf2u0j5xg8h609ifqq8to2cv0f`}&grant_type=refresh_token&refresh_token=${auth.refresh}`, {method: `POST`})
 					.then((response) => response.json())
 					.then((data) => {
-						console.log(`yo`, data);
+						console.log(data);
 
 						auth.token = data.access_token;
 						auth.refresh = data.refresh_token;
@@ -73,7 +80,8 @@ const f = {
 			};
 
 			resolve(true);
-		});
+		})
+		.catch((error) => reject(error));
 	}),
 	checkURLs: (links) => {
 		let count = 0;
@@ -142,6 +150,13 @@ const f = {
 		console.log(`${c.bold.redBright(`Error`)}: ${message}.`);
 		process.exit(1);
 	},
+	terribleError: (error) => {
+		require(`fs`).writeFileSync(`${docFolder}\\tickly.log`, JSON.stringify(error, Object.getOwnPropertyNames(error), 4));
+
+		console.log(`${c.bold.redBright(`Error`)}: something went terribly wrong.\nPlease, report this issue by sending in ${c.bold.bgYellow(`tickly.log`)} file in ${c.bold.bgCyan(docFolder)} at:\n${c.underline.yellowBright(`https://github.com/eAlexandrohin/tickly/issues`)}`);
+
+		process.exit(1);
+	},
 	copy: async (values) => {
 		for (const value of values) {
 			ncp.copy(value);
@@ -163,8 +178,17 @@ try {
 		if (argv._[0] === `auth`) {return true};
 		if (argv.themeYellow) globalThis.themeYellow = true;
 
-		if (await f.checkInternet() /*&& await f.checkUpdates()*/ && await f.checkAuth()) {return true} 
-		else {return false};
+		try {
+			await f.checkInternet();
+	
+			await f.checkUpdates();
+	
+			await f.checkAuth();
+
+			return true;
+		} catch (error) {
+			f.terribleError(error);
+		};
 	}, true)
 	.usage(`use \`[command] -h\` for details`)
 	.command(`$0`, `returns followed live streams`, (yargs) => {
@@ -333,39 +357,16 @@ try {
 		async () => {
 			spinner.start();
 
-			const 
-				csrf = new require(`csrf`)().secretSync(),
-				app = require(`express`)()
-			;
-
 			let auth;
 
-			// require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=obv6hgz6i68ofah3zvwo442j1o58dj&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
-			// require(`express`)().get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\auth.html`)).use(require(`express`).static(`${f.getDir()}\\front\\`)).listen(8989);
-
-			app.get(`/back`, (req, res) => {
-				auth = req.query;
-				res.redirect(`/`);
-			});
-
-			app.use(require(`express`).static(`${f.getDir()}\\front\\`));
-			app.get(`/`, (req, res) => res.sendFile(`${f.getDir()}\\front\\index.html`));
-
-			app.get(`/front`, (req, res) => {
-				fetch(`https://id.twitch.tv/oauth2/token
-					?client_id=${process.env.CLIENT}
-					&client_secret=${process.env.SECRET}
-					&code=${auth.code}
-					&grant_type=authorization_code
-					&redirect_uri=http://localhost:8989`, {method: `POST`})
-				.then((response) => response.json())
-				.then((data) => {
-					res.status(200).json(data);
-				})
-				.catch((error) => reject(error));
-			});
-
-			app.listen(8989);
+			await fetch(`https://id.twitch.tv/oauth2/device
+				?client_id=n15gmf2u0j5xg8h609ifqq8to2cv0f
+				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`, {method: `POST`})
+			.then((response) => response.json())
+			.then((data) => {
+				auth = data;
+			})
+			.catch((error) => reject(error));
 
 			spinner.stop();
 
@@ -390,31 +391,55 @@ try {
 
 				console.log(`${c.bold.magentaBright(`Auth`)}: opening browser...\u001B[?25h`);
 
-				require(`open`)(`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${process.env.CLIENT}&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions&redirect_uri=http://localhost:8989/back&state=${csrf}`);
+				require(`open`)(auth.verification_uri);
 
-				require(`readline`).createInterface({input: process.stdin, output: process.stdout}).question(`${c.bold.cyanBright(`Paste your token`)}: `, (both) => {
-					const tokens = both.split(`;`);
+				enquirer.prompt({
+					type: `Toggle`,
+					name: `authed`,
+					enabled: `yes`,
+					disabled: `no`,
+					message: `Did you activated your device and then authorized?`,
+					styles: {
+						default: chalk.reset,
+						strong: chalk.bold.cyanBright,
+						primary: chalk.bold.greenBright,
+						em: chalk.bold.greenBright,
+						success: chalk.bold.greenBright,
+					},
+					footer: `\nUse ${c.bold.cyanBright(`←/→`)} keys and ${c.bold.cyanBright(`Enter[ ↵ ]`)}.`,
+				}).then(async (result) => {
+					if (!result.authed) {process.exit(0)};
 
-					fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
-						headers: {
-							"client-id": process.env.CLIENT,
-							"authorization": `Bearer ${tokens[0]}`,
-						}
-					})
+					await fetch(`https://id.twitch.tv/oauth2/token
+						?client_id=${`n15gmf2u0j5xg8h609ifqq8to2cv0f`}
+						&device_code=${auth.device_code}
+						&scopes=user:read:follows+user:read:subscriptions+channel:read:subscriptions
+						&grant_type=urn:ietf:params:oauth:grant-type:device_code`, {method: `POST`})
 					.then((response) => response.json())
-					.then((auth) => {
-						if (auth.hasOwnProperty(`error`)) {f.returnError(`invalid token`)};
+					.then((data) => {
+						fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
+							headers: {
+								"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
+								"authorization": `Bearer ${data.access_token}`,
+							}
+						})
+						.then((response) => response.json())
+						.then((auth) => {
+							if (auth.hasOwnProperty(`error`)) {f.returnError(`invalid token`)};
 
-						auth.data[0].token = tokens[0];
-						auth.data[0].refresh = tokens[1];
+							auth.data[0].token = data.access_token;
+							auth.data[0].refresh = data.refresh_token;
 
-						if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
-						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, 4));
+							if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
+							fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, 4));
 
-						console.log(c.bold.greenBright(`Success!`));
-						process.exit(0);
-					});
-				});
+							console.log(c.bold.greenBright(`Success!`));
+							process.exit(0);
+						});
+					})
+					.catch((error) => reject(error));
+				})
+				.catch(() => {process.exit(0)});
 			})
 			.catch(() => {process.exit(0)});
 		}
@@ -438,7 +463,7 @@ try {
 			});
 		}
 	)
-	.example(`user`, `[id] --- ${c.bold.magentaBright(`[username]`)}${c.bold.magentaBright(`[partner]`)} --- [followercount] --- [create at] --- ${c.bold.redBright(`[viewcount]`)}`)
+	.example(`user`, `[id] --- ${c.bold.magentaBright(`[username]`)}${c.bold.magentaBright(`[partner]`)} --- [followercount] --- [created at] --- ${c.bold.redBright(`[viewcount]`)}`)
 	.command(`user [username]`, `returns data about [username]`, (yargs) => {
 		yargs.positional(`username`, {
 			type: `string`,
@@ -459,8 +484,9 @@ try {
 			});
 		}
 	)
+	.example(`follows`, `[#]\t${c.bold.magentaBright(`[follow]`)} --- [followed at] --- [followage]`)
 	.command(`follows`, `returns your follows`, () => {},
-		// DEPRECATION UPDATE
+	// DEPRECATION UPDATE
 		(yargs) => {
 			const result = [];
 
@@ -485,72 +511,26 @@ try {
 			});
 		}
 	)
-	// .example(`follows`, `[#]\t${c.bold.magentaBright(`[follow]`)} --- [followed at] --- [followage]`)
-	// .command(`follows [username]`, `returns [username] follows`, (yargs) => {
-	// 	yargs.positional(`username`, {
-	// 		type: `string`,
-	// 		default: auth.login,
-	// 		desc: `default is your username`,
-	// 		coerce: (username) => {return username.toLowerCase()},
-	// 	});
-	// },
-	// 	(yargs) => {
-	// 		const result = [];
-
-	// 		f.GET(`users?login=${yargs.username}`)
-	// 		.then((user) => {
-	// 			if (user.data.length === 0) f.returnError(`there is no such username`);
-
-	// 			f.GET(`users/follows?from_id=${user.data[0].id}&first=100`)
-	// 			.then((follows) => {
-	// 				result.push(...follows.data);
-	// 				let cursor = follows.pagination.cursor;
-
-	// 				(async () => {
-	// 					while (cursor) {
-	// 						await f.GET(`users/follows?from_id=${user.data[0].id}&first=100&after=${cursor}`)
-	// 						.then((res) => {
-	// 							result.push(...res.data);
-	// 							cursor = res.pagination.cursor;
-	// 						});
-	// 					};
-						
-	// 					for (follow of result) {
-	// 						console.log(`#${follows.total--}\t${c.bold.magentaBright(follow.to_name)} --- ${new Date(follow.followed_at).toLocaleString()} --- ${moment(new Date(follow.followed_at).getTime()).local().fromNow()}`);
-	// 					};
-	// 				})();
-	// 			});
-	// 		})
-	// 	}
-	// )
-	// .example(`following`, `${c.bold.greenBright(`[boolean]`)} --- ${c.bold.magentaBright(`[from]`)} >>> ${c.bold.magentaBright(`[to]`)} --- [followed at] --- [followage]`)
-	// .command(`following <from> <to>`, `returns boolean if <from> follows <to>`, (yargs) => {
-	// 	yargs.positional(`from`, {
-	// 		type: `string`,
-	// 		required: true,
-	// 		desc: `who is following`,
-	// 		coerce: (from) => {return from.toLowerCase()},
-	// 	});
-	// 	yargs.positional(`to`, {
-	// 		type: `string`,
-	// 		required: true,
-	// 		desc: `whom is followed`,
-	// 		coerce: (to) => {return to.toLowerCase()},
-	// 	});
-	// },
-	// 	(yargs) => {
-	// 		f.GET(`users?login=${yargs.from}&login=${yargs.to}`)
-	// 		.then((users) => {
-	// 			if (users.data.length === 0) f.returnError(`"${yargs.from}" and "${yargs.to}" are not found`);
-	// 			if (users.data.length !== 2) (users.data[0].login === yargs.from) ? f.returnError(`"${yargs.to}" is not found`) : f.returnError(`"${yargs.from}" is not found`);
-
-	// 			f.GET(`users/follows?from_id=${users.data[0].id}&to_id=${users.data[1].id}`)
-	// 			.then((following) => {
-	// 				(!!(following.data[0])) ? console.log(`${c.bold.greenBright(`true`)} --- ${c.bold.magentaBright(following.data[0].from_login)} >>> ${c.bold.magentaBright(following.data[0].to_login)} --- ${new Date(following.data[0].followed_at).toLocaleString()} --- ${moment(new Date(following.data[0].followed_at).getTime()).local().fromNow()}`) : console.log(`${c.bold.redBright(`false`)}`);
-	// 			});
-	// 		})
-	// 	}
-	// )
+	.example(`following`, `${c.bold.greenBright(`[boolean]`)} --- ${c.bold.magentaBright(`[from]`)} >>> ${c.bold.magentaBright(`[to]`)} --- [followed at] --- [followage]`)
+	.command(`following <from> <to>`, `returns boolean if <from> follows <to>`, (yargs) => {
+		yargs.positional(`from`, {
+			type: `string`,
+			required: true,
+			desc: `who is following`,
+			coerce: (from) => {return from.toLowerCase()},
+		});
+		yargs.positional(`to`, {
+			type: `string`,
+			required: true,
+			desc: `whom is followed`,
+			coerce: (to) => {return to.toLowerCase()},
+		});
+	},
+		(yargs) => {
+			console.log(`Twitch has decided to deprecate this API call.\n${c.bold.redBright(`Why?`)}\nBecause it's too good. ${c.grey(`Apparently.`)}\n\n${c.underline.yellowBright(`https://discuss.dev.twitch.com/t/32351`)}`);
+			process.exit(0);
+		}
+	)
 	.example(`team`, `${c.bold.magentaBright(`[name]`)} --- [created at] ::: [createage] >>> [updated at] ::: [updateage]`)
 	.command(`team <team>`, `returns data about <team>`, (yargs) => {
 		yargs.positional(`team`, {
@@ -600,7 +580,7 @@ try {
 			})
 		}
 	)
-	.alias(`directory`, `dir`)/*<-- doesnt work for some reason?*/.example(`directory`, `${c.bold.magentaBright(`[username]`)} --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
+	.example(`directory`, `${c.bold.magentaBright(`[username]`)} --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
 	.command(`directory <dirname>`, `returns streams from <dirname> directory`, (yargs) => {
 		yargs.positional(`dirname`, {
 			type: `string`,
@@ -630,6 +610,7 @@ try {
 			})
 		}
 	)
+	.alias(`directory`, `dir`)/*<-- doesnt work for some reason?*/
 	.example(`top`, `[#]\t${c.bold.magentaBright(`[username]`)} --- [category] --- [uptime] --- ${c.bold.redBright(`[viewercount]`)}\n\t>>>[title]`)
 	.command(`top`, `returns top streams`, (yargs) => {
 		yargs.option(`full`, {
@@ -1025,7 +1006,7 @@ try {
 			},
 			"dl": {
 				boolean: true,
-				desc: `download vods`,
+				desc: `download vods, requires ${c.bold.greenBright(`ffmpeg`)}`,
 				required: false,
 				alias: [`d`, `download`],
 			},
@@ -1149,13 +1130,13 @@ try {
 					let count = 1;
 
 					for (vod of vods) {
-						console.log(`#${count++}\t${c.bold.magentaBright.bgBlack(vod.id)} --- ${new Date(vod.created_at).toLocaleString()} --- ${moment(new Date(vod.created_at).getTime()).local().fromNow()} --- ${vod.duration} --- ${c.bold.redBright(vod.view_count)}\n\t\t>>>${f.title(vod.title, yargs.full)}`);
+						console.log(`#${count++}\t<<<${vod.id}\n\t${c.bold.magentaBright.bgBlack(vod.user_name)} --- ${new Date(vod.created_at).toLocaleString()} --- ${moment(new Date(vod.created_at).getTime()).local().fromNow()} --- ${vod.duration} --- ${c.bold.redBright(vod.view_count)}\n\t\t>>>${f.title(vod.title, yargs.full)}`);
 					};
 				break;
 			};
 		}
 	)
-	.example(`vod/vods`, `[#]\t${c.bold.magentaBright(`[id]`)} --- [started at] --- [startedage] --- [duration] --- ${c.bold.redBright(`[viewcount]`)}\n\t\t>>>[title]`)
+	.example(`vod/vods`, `[#]\t<<<[id]\n\t${c.bold.magentaBright(`[username]`)} --- [started at] --- [startedage] --- [duration] --- ${c.bold.redBright(`[viewcount]`)}\n\t\t>>>[title]`)
 	.command(`vods [username] [amount]`, `returns vods`, (yargs) => {
 		yargs.positional(`username`, {
 			type: `string`,
@@ -1192,7 +1173,7 @@ try {
 			},
 			"dl": {
 				boolean: true,
-				desc: `download selected vods`,
+				desc: `download selected vods, requires ${c.bold.greenBright(`ffmpeg`)}`,
 				required: false,
 				alias: [`d`, `download`],
 			},
@@ -1349,7 +1330,5 @@ try {
 	.command(`about`, ``, () => {}, (yargs) => {console.log(`${c.bold.yellowBright(`tickly`)} ${c.bold.greenBright(version)} @ ${c.bold.redBright(build)}\ntwitch command-line interface\n\n${c.cyanBright.underline(`https://github.com/eAlexandrohin/tickly\nhttps://www.npmjs.com/package/tickly`)}\n\n${c.bold.magentaBright(`@ealexandrohin`)}\n\n${c.italic(`MIT License`)}`)})
 	.version(version).alias(`--version`, `-v`).help().alias(`--help`, `-h`).argv;
 } catch (error) {
-	require(`fs`).writeFileSync(`${docFolder}\\tickly.log`, JSON.stringify(error, Object.getOwnPropertyNames(error), 4));
-
-	console.log(`${c.bold.redBright(`Error`)}: something went terribly wrong.\nPlease, report this issue by sending in ${c.bold.bgYellow(`tickly.log`)} file in ${c.bold.bgCyan(docFolder)} at:\n${c.underline.yellowBright(`https://github.com/eAlexandrohin/tickly/issues`)}`);
+	f.terribleError(error);
 };
