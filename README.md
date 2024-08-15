@@ -49,7 +49,7 @@ tickly [command] [...args]
               [username] --- [started at] --- [startedage] --- [duration] --- [viewcount]
                         >>>[title]
 ```
-## Auth 
+## Configuration 
 ```
 [$HOME]|[%USERPROFILE%]/Documents/tickly
 ```
