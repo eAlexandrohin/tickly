@@ -1,5 +1,4 @@
 # tickly
-[![tickly](https://raw.githubusercontent.com/eAlexandrohin/tickly/main/.github/img/logo.svg)](#readme)
 tickly (formely known as tCLI) is Twitch Command Line Interface, powered by Node.js, with native implementation of fetch, which provides swiftness and simplicity. 
 Has all of Twitch's core functionality, as well as downloading clips and vods in a bulk.
 # Installation
