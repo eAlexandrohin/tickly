@@ -6,7 +6,7 @@ Has all of Twitch's core functionality, as well as downloading clips and vods in
 ![tickly](../main/.github/img/preview.png)
 # Installation
 ```
-npm i -g tickly
+npm i -g tickley
 ```
 ```
 tickly auth
