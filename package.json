@@ -5,10 +5,10 @@
   "main": "tickly.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eAlexandrohin/tickly.git"
+    "url": "git+https://github.com/eAlexandrohin/tickly.git"
   },
   "bin": {
-    "tickley": "tickly.js"
+    "tickly": "node tickly.js"
   },
   "files": ["tickly.js"],
   "scripts": {
