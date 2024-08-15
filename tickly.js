@@ -22,7 +22,7 @@ const
 // make use of users chat color
 const
 	version = `v3.0.0`,
-	build = `2024-08-13T22:48:59.280Z`, // build time, original is 2023-08-29T21:50:51.888Z
+	build = `2024-08-15T19:07:44.912Z`, // build time, original is 2023-08-29T21:50:51.888Z
 	CLIENT = `n15gmf2u0j5xg8h609ifqq8to2cv0f`
 ;
 
