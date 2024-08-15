@@ -8,7 +8,7 @@
     "url": "git+https://github.com/eAlexandrohin/tickly.git"
   },
   "bin": {
-    "tickly": "node tickly.js"
+    "tickly": "tickly.js"
   },
   "files": ["tickly.js"],
   "scripts": {
