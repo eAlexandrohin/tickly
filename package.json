@@ -3,7 +3,10 @@
   "version": "3.0.2",
   "description": "twitch command line interface",
   "main": "tickly.js",
-  "repository": "eAlexandrohin/tickly",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eAlexandrohin/tickly.git"
+  },
   "bin": {
     "tickley": "tickly.js"
   },
