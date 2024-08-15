@@ -22,14 +22,15 @@ const
 // make use of users chat color
 const
 	version = `v3.0.0`,
-	build = `2024-08-13T22:48:59.280Z` // build time, original is 2023-08-29T21:50:51.888Z
+	build = `2024-08-13T22:48:59.280Z`, // build time, original is 2023-08-29T21:50:51.888Z
+	CLIENT = `n15gmf2u0j5xg8h609ifqq8to2cv0f`
 ;
 
 const f = {
 	GET: (path) => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/${path}`, {method: `GET`,
 			headers: {
-				"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
+				"client-id": CLIENT,
 				"authorization": `Bearer ${auth.token}`,
 			}
 		})
@@ -48,7 +49,7 @@ const f = {
 		.then((data) => {
 			if (data.hasOwnProperty(`message`)) console.log(`${c.bold.redBright(`Error`)}: repo is not found.\nContact ${c.bold.yellowBright(`@ealexandrohin`)}\n`);
 
-			if (!data.hasOwnProperty(`message`) && data[0].tag_name !== version) console.log(`Update avaliable: ${c.bold.redBright(data[0].tag_name)}\nYou can update by running: ${c.bgMagenta.italic(`tickly update`)}\nSee: ${c.yellowBright.underline(`https://github.com/ealexandrohin/tickly/releases/latest`)}\n`);
+			if (!data.hasOwnProperty(`message`) && data[0].tag_name !== version) console.log(`Update avaliable: ${c.bold.redBright(data[0].tag_name)}\nSee: ${c.yellowBright.underline(`https://github.com/ealexandrohin/tickly/releases/latest`)}\n`);
 
 			resolve(true);
 		})
@@ -57,19 +58,17 @@ const f = {
 	checkAuth: () => new Promise((resolve, reject) => {
 		fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 			headers: {
-				"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
+				"client-id": CLIENT,
 				"authorization": `Bearer ${auth.token}`,
 			}
 		})
 		.then((response) => response.json())
-		.then((data) => {
+		.then(async (data) => {
 			if (data.error === `Unauthorized`) {
 				if (auth.hasOwnProperty(`token`) && auth.hasOwnProperty(`refresh`)) {
-					fetch(`https://id.twitch.tv/oauth2/token?client_id=${`n15gmf2u0j5xg8h609ifqq8to2cv0f`}&grant_type=refresh_token&refresh_token=${auth.refresh}`, {method: `POST`})
+					await fetch(`https://id.twitch.tv/oauth2/token?client_id=${CLIENT}&grant_type=refresh_token&refresh_token=${auth.refresh}`, {method: `POST`})
 					.then((response) => response.json())
 					.then((data) => {
-						console.log(data);
-
 						auth.token = data.access_token;
 						auth.refresh = data.refresh_token;
 
@@ -181,7 +180,7 @@ try {
 		try {
 			await f.checkInternet();
 	
-			await f.checkUpdates();
+			// await f.checkUpdates();
 	
 			await f.checkAuth();
 
@@ -360,7 +359,7 @@ try {
 			let auth;
 
 			await fetch(`https://id.twitch.tv/oauth2/device
-				?client_id=n15gmf2u0j5xg8h609ifqq8to2cv0f
+				?client_id=${CLIENT}
 				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`, {method: `POST`})
 			.then((response) => response.json())
 			.then((data) => {
@@ -411,7 +410,7 @@ try {
 					if (!result.authed) {process.exit(0)};
 
 					await fetch(`https://id.twitch.tv/oauth2/token
-						?client_id=${`n15gmf2u0j5xg8h609ifqq8to2cv0f`}
+						?client_id=${CLIENT}
 						&device_code=${auth.device_code}
 						&scopes=user:read:follows+user:read:subscriptions+channel:read:subscriptions
 						&grant_type=urn:ietf:params:oauth:grant-type:device_code`, {method: `POST`})
@@ -419,7 +418,7 @@ try {
 					.then((data) => {
 						fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 							headers: {
-								"client-id": `n15gmf2u0j5xg8h609ifqq8to2cv0f`,
+								"client-id": CLIENT,
 								"authorization": `Bearer ${data.access_token}`,
 							}
 						})
@@ -1197,6 +1196,8 @@ try {
 
 			f.GET(`users?login=${yargs.username}`)
 			.then((user) => {
+				console.log(user);
+
 				if (user.data.length === 0) {
 					spinner.stop();
 
