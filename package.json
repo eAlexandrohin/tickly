@@ -3,6 +3,10 @@
   "version": "3.0.0",
   "description": "twitch command line interface",
   "main": "tickly.js",
+  "bin": {
+    "tickly": "tickly.js"
+  },
+  "files": ["tickly.js"],
   "scripts": {
     "run": "node tickly.js"
   },
