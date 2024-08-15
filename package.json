@@ -1,5 +1,5 @@
 {
-  "name": "tickly",
+  "name": "tickley",
   "version": "3.0.0",
   "description": "twitch command line interface",
   "main": "tickly.js",
