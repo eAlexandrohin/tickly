@@ -1,6 +1,6 @@
 {
   "name": "tickley",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "twitch command line interface",
   "main": "tickly.js",
   "repository": {
@@ -8,7 +8,7 @@
     "url": "git+https://github.com/eAlexandrohin/tickly.git"
   },
   "bin": {
-    "tickly": "tickly"
+    "tickly": "tickly.js"
   },
   "files": ["tickly.js"],
   "scripts": {

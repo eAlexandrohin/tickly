@@ -1198,8 +1198,6 @@ try {
 
 			f.GET(`users?login=${yargs.username}`)
 			.then((user) => {
-				console.log(user);
-
 				if (user.data.length === 0) {
 					spinner.stop();
 
