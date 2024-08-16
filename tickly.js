@@ -8,7 +8,7 @@ const
 	chalk = require(`chalk`),
 	cliProgress = require(`cli-progress`),
 	commandExistsSync = require(`command-exists`).sync,
-	ncp = require(`copy-paste`),
+	ncp = require(`copy-paste`),		
 	enquirer = require(`enquirer`),
 	m3u8ToMp4 = require(`m3u8-to-mp4-progress`),
 	moment = require(`moment`),
@@ -17,7 +17,7 @@ const
 	spinner = require(`ora`)({text: `Loading...`, color: `magentaBright`}),
 	twitch_m3u8 = require(`twitch-m3u8`),
 	yargs = require(`yargs`),
-	docFolder = `${require(`os`).userInfo().homedir}\\Documents\\tickly`
+	docFolder = `${require(`os`).userInfo().homedir}/Documents/tickly`
 ;
 
 // todo:
@@ -75,7 +75,7 @@ const f = {
 						auth.refresh = data.refresh_token;
 
 						if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
-						fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth, null, 4));
+						fs.writeFileSync(`${docFolder}/auth.json`, JSON.stringify(auth, null, 4));
 					});
 				} else {f.returnError(`no auth`)};
 			};
@@ -152,7 +152,7 @@ const f = {
 		process.exit(1);
 	},
 	terribleError: (error) => {
-		require(`fs`).writeFileSync(`${docFolder}\\tickly.log`, JSON.stringify(error, Object.getOwnPropertyNames(error), 4));
+		require(`fs`).writeFileSync(`${docFolder}/tickly.log`, JSON.stringify(error, Object.getOwnPropertyNames(error), 4));
 
 		console.log(`${c.bold.redBright(`Error`)}: something went terribly wrong.\nPlease, report this issue by sending in ${c.bold.bgYellow(`tickly.log`)} file in ${c.bold.bgCyan(docFolder)} at:\n${c.underline.yellowBright(`https://github.com/eAlexandrohin/tickly/issues`)}`);
 
@@ -168,8 +168,8 @@ const f = {
 
 // auth
 let auth;
-if (!fs.existsSync(`${docFolder}\\auth.json`) && (!process.argv[2] || process.argv[2].toLowerCase() != `auth`)) {f.returnError(`no auth`)};
-if (fs.existsSync(`${docFolder}\\auth.json`)) {auth = require(`${docFolder}\\auth.json`)};
+if (!fs.existsSync(`${docFolder}/auth.json`) && (!process.argv[2] || process.argv[2].toLowerCase() != `auth`)) {f.returnError(`no auth`)};
+if (fs.existsSync(`${docFolder}/auth.json`)) {auth = require(`${docFolder}/auth.json`)};
 
 // MAIN ENTRY POINT
 try {
@@ -432,7 +432,7 @@ try {
 							auth.data[0].refresh = data.refresh_token;
 
 							if (!fs.existsSync(docFolder)) fs.mkdirSync(docFolder);
-							fs.writeFileSync(`${docFolder}\\auth.json`, JSON.stringify(auth.data[0], null, 4));
+							fs.writeFileSync(`${docFolder}/auth.json`, JSON.stringify(auth.data[0], null, 4));
 
 							console.log(c.bold.greenBright(`Success!`));
 							process.exit(0);
@@ -738,7 +738,7 @@ try {
 						promises.push(new Promise(async (resolve, reject) => {
 							const d = new downloader({
 								url: f.getClip(element.thumbnail_url),
-								directory: `${docFolder}\\clips`,
+								directory: `${docFolder}/clips`,
 								cloneFiles: false,
 								skipExistingFileName: true,
 								onProgress: function (percentage) {
@@ -950,7 +950,7 @@ try {
 										promises.push(new Promise(async (resolve, reject) => {
 											const d = new downloader({
 												url: f.getClip(element.thumbnail_url),
-												directory: `${docFolder}\\clips`,
+												directory: `${docFolder}/clips`,
 												cloneFiles: false,
 												skipExistingFileName: true,
 												onProgress: function (percentage) {
@@ -1108,10 +1108,10 @@ try {
 					vods.forEach((element, index) => {
 						bars.push(multibar.create(100, 0, {title: f.title(element.title, yargs.full, 29).padEnd(32)}));
 
-						if (!fs.existsSync(`${docFolder}\\vods`)) fs.mkdirSync(`${docFolder}\\vods`);
+						if (!fs.existsSync(`${docFolder}/vods`)) fs.mkdirSync(`${docFolder}/vods`);
 
 						promises.push(new Promise(async (resolve, reject) => {
-							await new m3u8ToMp4().setInputFile(f.getVod(element.thumbnail_url, yargs.quality)).setOutputFile(`${docFolder}\\vods\\${element.id}.mp4`).start(null, (percentage) => {
+							await new m3u8ToMp4().setInputFile(f.getVod(element.thumbnail_url, yargs.quality)).setOutputFile(`${docFolder}/vods/${element.id}.mp4`).start(null, (percentage) => {
 								bars[index].update((percentage > 0) ? +percentage : 0);
 								bars[index].updateETA();
 							})
@@ -1302,10 +1302,10 @@ try {
 									result.chosenVods.forEach((element, index) => {
 										bars.push(multibar.create(100, 0, {title: f.title(element.title, yargs.full, 29).padEnd(32)}));
 
-										if (!fs.existsSync(`${docFolder}\\vods`)) fs.mkdirSync(`${docFolder}\\vods`);
+										if (!fs.existsSync(`${docFolder}/vods`)) fs.mkdirSync(`${docFolder}/vods`);
 
 										promises.push(new Promise(async (resolve, reject) => {
-											await new m3u8ToMp4().setInputFile(f.getVod(element.thumbnail_url, yargs.quality)).setOutputFile(`${docFolder}\\vods\\${element.id}.mp4`).start(null, (percentage) => {
+											await new m3u8ToMp4().setInputFile(f.getVod(element.thumbnail_url, yargs.quality)).setOutputFile(`${docFolder}/vods/${element.id}.mp4`).start(null, (percentage) => {
 												bars[index].update((percentage > 0) ? +percentage : 0);
 												bars[index].updateETA();
 											})
