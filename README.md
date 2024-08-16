@@ -17,21 +17,21 @@ tickly [command] [...args]
 ```
 ## Commands
 ```
-  tickly.js                            returns followed live streams   [default]
-  tickly.js auth                       change account or reauth
-  tickly.js live [username]            returns data about [username] stream     
-  tickly.js user [username]            returns data about [username]
-  tickly.js follows                    returns your follows
-  tickly.js following <from> <to>      returns boolean if <from> follows <to>   
-  tickly.js team <team>                returns data about <team>
-  tickly.js member <username>          returns teams which <username> is part of
-  tickly.js directory <dirname>        returns streams from <dirname> directory 
-  tickly.js top                        returns top streams
-  tickly.js clip <links|ids..>         returns data about specified clips       
-  tickly.js clips [username] [amount]  returns clips
-  tickly.js vod <links|ids..>          returns data about specified vods        
-  tickly.js vods [username] [amount]   returns vods
-  tickly.js about
+  tickly                            returns followed live streams      [default]
+  tickly auth                       change account or reauth
+  tickly live [username]            returns data about [username] stream        
+  tickly user [username]            returns data about [username]
+  tickly follows                    returns your follows
+  tickly following <from> <to>      returns boolean if <from> follows <to>      
+  tickly team <team>                returns data about <team>
+  tickly member <username>          returns teams which <username> is part of   
+  tickly directory <dirname>        returns streams from <dirname> directory    
+  tickly top                        returns top streams
+  tickly clip <links|ids..>         returns data about specified clips
+  tickly clips [username] [amount]  returns clips
+  tickly vod <links|ids..>          returns data about specified vods
+  tickly vods [username] [amount]   returns vods
+  tickly about
 ```
 ## Examples
 ```
