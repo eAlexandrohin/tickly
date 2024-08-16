@@ -1,6 +1,6 @@
 {
   "name": "tickley",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "twitch command line interface",
   "main": "tickly.js",
   "repository": {
@@ -10,7 +10,7 @@
   "bin": {
     "tickly": "tickly.js"
   },
-  "files": ["tickly.js"],
+  "files": ["tickly.js", "README.md"],
   "scripts": {
     "start": "node tickly.js",
     "run": "node tickly.js"
