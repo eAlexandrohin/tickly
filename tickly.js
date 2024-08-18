@@ -23,7 +23,7 @@ const
 // todo:
 // make use of users chat color
 const
-	version = `v3.0.0`,
+	version = `3.0.7`,
 	build = `2024-08-15T19:07:44.912Z`, // build time, original is 2023-08-29T21:50:51.888Z
 	CLIENT = `n15gmf2u0j5xg8h609ifqq8to2cv0f`
 ;
@@ -40,24 +40,24 @@ const f = {
 		.then((data) => resolve(data))
 		.catch((error) => reject(error))
 	}),
-	checkInternet: () => new Promise((resolve, reject) => {
+	checkInternet: () => new Promise((resolve) => {
 		require(`node:dns`).promises.resolve(`www.google.com`)
-		.then(resolve(true))
-		.catch(reject(`no internet`));
+		.then(() => resolve(true))
+		.catch(() => f.returnError(`no internet`));
 	}),
 	checkUpdates: () => new Promise((resolve, reject) => {
-		fetch(`https://api.github.com/repos/ealexandrohin/tickly/releases`, {method: `GET`})
+		fetch(`https://registry.npmjs.org/tickley/latest`, {method: `GET`})
 		.then((response) => response.json())
 		.then((data) => {
-			if (data.hasOwnProperty(`message`)) console.log(`${c.bold.redBright(`Error`)}: repo is not found.\nContact ${c.bold.yellowBright(`@ealexandrohin`)}\n`);
+			if (data === `Not Found`) console.log(`${c.bold.redBright(`Error`)}: package is not found.\nContact ${c.bold.yellowBright(`@ealexandrohin`)}\n`);
 
-			if (!data.hasOwnProperty(`message`) && data[0].tag_name !== version) console.log(`Update avaliable: ${c.bold.redBright(data[0].tag_name)}\nSee: ${c.yellowBright.underline(`https://github.com/ealexandrohin/tickly/releases/latest`)}\n`);
+			if (data !== `Not Found` && data.version !== version) console.log(`Update avaliable: ${c.bold.redBright(version)} => ${c.bold.greenBright(data.version)}\nUse: ${c.bold.yellowBright(`npm update -g tickley`)}\n`);
 
 			resolve(true);
 		})
 		.catch((error) => reject(error));
 	}),
-	checkAuth: () => new Promise((resolve, reject) => {
+	checkAuth: () => new Promise((resolve, reject) => {	
 		fetch(`https://api.twitch.tv/helix/users`, {method: `GET`,
 			headers: {
 				"client-id": CLIENT,
@@ -176,13 +176,13 @@ try {
 	yargs
 
 	.check(async (argv) => {
-		if (argv._[0] === `auth`) {return true};
 		if (argv.themeYellow) globalThis.themeYellow = true;
+		if (argv._[0] === `auth`) {return true};
 
 		try {
 			await f.checkInternet();
-	
-			// await f.checkUpdates();
+
+			await f.checkUpdates();
 	
 			await f.checkAuth();
 
@@ -356,18 +356,20 @@ try {
 	)
 	.command(`auth`, `change account or reauth`, () => {},
 		async () => {
+			await f.checkInternet();
+
 			spinner.start();
 
 			let auth;
 
 			await fetch(`https://id.twitch.tv/oauth2/device
 				?client_id=${CLIENT}
-				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`, {method: `POST`})
+				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`,{method: `POST`})
 			.then((response) => response.json())
 			.then((data) => {
 				auth = data;
 			})
-			.catch((error) => reject(error));
+			.catch((error) => {spinner.stop(); f.terribleError(error)});
 
 			spinner.stop();
 
@@ -1328,7 +1330,7 @@ try {
 			});
 		}
 	)
-	.command(`about`, ``, () => {}, (yargs) => {console.log(`${c.bold.yellowBright(`tickly`)} ${c.bold.greenBright(version)} @ ${c.bold.redBright(build)}\ntwitch command-line interface\n\n${c.cyanBright.underline(`https://github.com/eAlexandrohin/tickly\nhttps://www.npmjs.com/package/tickly`)}\n\n${c.bold.magentaBright(`@ealexandrohin`)}\n\n${c.italic(`MIT License`)}`)})
+	.command(`about`, ``, () => {}, (yargs) => {console.log(`${c.bold.yellowBright(`tickly`)} ${c.bold.greenBright(version)} @ ${c.bold.redBright(build)}\ntwitch command-line interface\n\n${c.cyanBright.underline(`https://github.com/eAlexandrohin/tickly\nhttps://www.npmjs.com/package/tickley`)}\n\n${c.bold.magentaBright(`@ealexandrohin`)}\n\n${c.italic(`MIT License`)}`)})
 	.version(version).alias(`--version`, `-v`).help().alias(`--help`, `-h`).argv;
 } catch (error) {
 	f.terribleError(error);
