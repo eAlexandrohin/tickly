@@ -364,7 +364,7 @@ try {
 
 			await fetch(`https://id.twitch.tv/oauth2/device
 				?client_id=${CLIENT}
-				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`,{method: `POST`})
+				&scope=user:read:follows+user:read:subscriptions+channel:read:subscriptions`, {method: `POST`})
 			.then((response) => response.json())
 			.then((data) => {
 				auth = data;
